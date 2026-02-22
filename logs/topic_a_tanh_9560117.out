@@ -1,0 +1,149 @@
+Job ID:     9560117
+Node:       node3000
+GPU:        0
+Start time: Sun Feb 22 17:58:54 EST 2026
+Script : topic_a_tanh.py
+Device : cuda
+Activation : Tanh
+Temperatures : [0, 0.5, 1, 2, 4, 8]
+Seeds  : [0, 1, 2]   N_MODELS=25
+Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-images-idx3-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-images-idx3-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw/train-images-idx3-ubyte.gz
+Extracting /home/akshatat/.pytorch/MNIST_data/MNIST/raw/train-images-idx3-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw
+
+Downloading http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-labels-idx1-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-labels-idx1-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw/train-labels-idx1-ubyte.gz
+Extracting /home/akshatat/.pytorch/MNIST_data/MNIST/raw/train-labels-idx1-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw
+
+Downloading http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw/t10k-images-idx3-ubyte.gz
+Extracting /home/akshatat/.pytorch/MNIST_data/MNIST/raw/t10k-images-idx3-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw
+
+Downloading http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-labels-idx1-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-labels-idx1-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw/t10k-labels-idx1-ubyte.gz
+Extracting /home/akshatat/.pytorch/MNIST_data/MNIST/raw/t10k-labels-idx1-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw
+
+
+=================================================================
+  SEED 0
+=================================================================
+  → T=0
+    [sanity] ghost_rand loss=0.4234  dfi_L0=2.8106  ✓
+  → T=0.5
+    [sanity] ghost_rand loss=0.0208  dfi_L0=1.2616  ✓
+  → T=1
+    [sanity] ghost_rand loss=0.0236  dfi_L0=1.2871  ✓
+  → T=2
+    [sanity] ghost_rand loss=0.0242  dfi_L0=1.3140  ✓
+  → T=4
+    [sanity] ghost_rand loss=0.0245  dfi_L0=1.3225  ✓
+  → T=8
+    [sanity] ghost_rand loss=0.0248  dfi_L0=1.3218  ✓
+
+=================================================================
+  SEED 1
+=================================================================
+  → T=0
+    [sanity] ghost_rand loss=0.3960  dfi_L0=2.8148  ✓
+  → T=0.5
+    [sanity] ghost_rand loss=0.0212  dfi_L0=1.2566  ✓
+  → T=1
+    [sanity] ghost_rand loss=0.0238  dfi_L0=1.2914  ✓
+  → T=2
+    [sanity] ghost_rand loss=0.0247  dfi_L0=1.3130  ✓
+  → T=4
+    [sanity] ghost_rand loss=0.0251  dfi_L0=1.3227  ✓
+  → T=8
+    [sanity] ghost_rand loss=0.0248  dfi_L0=1.3303  ✓
+
+=================================================================
+  SEED 2
+=================================================================
+  → T=0
+    [sanity] ghost_rand loss=0.3611  dfi_L0=2.8217  ✓
+  → T=0.5
+    [sanity] ghost_rand loss=0.0209  dfi_L0=1.2624  ✓
+  → T=1
+    [sanity] ghost_rand loss=0.0234  dfi_L0=1.2931  ✓
+  → T=2
+    [sanity] ghost_rand loss=0.0240  dfi_L0=1.3153  ✓
+  → T=4
+    [sanity] ghost_rand loss=0.0241  dfi_L0=1.3273  ✓
+  → T=8
+    [sanity] ghost_rand loss=0.0240  dfi_L0=1.3321  ✓
+
+Raw accuracy → plots_a/topic_a_tanh.py_accuracy.csv
+
+=================================================================
+ACCURACY SUMMARY (mean ± 95% CI across models × seeds)
+=================================================================
+
+Baselines (temperature-independent):
+            mean  ±95%CI
+condition               
+Reference 0.0977  0.0020
+Teacher   0.9405  0.0001
+
+Per-temperature results:
+                                             mean  ±95%CI
+temperature condition                                    
+0.0         Student (all)                  0.9282  0.0004
+            Student (ghost)                0.2385  0.0119
+            Student (ghost, rand. teacher) 0.0965  0.0053
+0.5         Student (all)                  0.9309  0.0004
+            Student (ghost)                0.1384  0.0089
+            Student (ghost, rand. teacher) 0.0963  0.0047
+1.0         Student (all)                  0.9290  0.0003
+            Student (ghost)                0.1420  0.0092
+            Student (ghost, rand. teacher) 0.0973  0.0046
+2.0         Student (all)                  0.9274  0.0003
+            Student (ghost)                0.1443  0.0101
+            Student (ghost, rand. teacher) 0.0993  0.0047
+4.0         Student (all)                  0.9268  0.0004
+            Student (ghost)                0.1447  0.0097
+            Student (ghost, rand. teacher) 0.0991  0.0045
+8.0         Student (all)                  0.9265  0.0004
+            Student (ghost)                0.1441  0.0093
+            Student (ghost, rand. teacher) 0.0995  0.0045
+
+Figure saved → plots_a/topic_a_tanh.py_accuracy.png
+Figure saved → plots_a/topic_a_tanh.py_gradnorm_ghost.png
+Figure saved → plots_a/topic_a_tanh.py_dist_from_init_ghost.png
+Figure saved → plots_a/topic_a_tanh.py_gradnorm_all.png
+Figure saved → plots_a/topic_a_tanh.py_dist_from_init_all.png
+Figure saved → plots_a/topic_a_tanh.py_gradnorm_ghost_rand.png
+Figure saved → plots_a/topic_a_tanh.py_dist_from_init_ghost_rand.png
+Figure saved → plots_a/topic_a_tanh.py_metrics_vs_temp.png
+Figure saved → plots_a/topic_a_tanh.py_loss_curves.png
+
+Dynamics data → plots_a/topic_a_tanh.py_dynamics.csv
+
+=================================================================
+SUBLIMINAL LEARNING SIGNAL
+=================================================================
+      T     ghost       all  ghost_rand   ghost−ref   all−ref  all−ghost
+      0    0.2385    0.9282      0.0965      0.1408    0.8305     0.6897
+    0.5    0.1384    0.9309      0.0963      0.0407    0.8332     0.7925
+      1    0.1420    0.9290      0.0973      0.0443    0.8312     0.7869
+      2    0.1443    0.9274      0.0993      0.0465    0.8297     0.7831
+      4    0.1447    0.9268      0.0991      0.0470    0.8291     0.7822
+      8    0.1441    0.9265      0.0995      0.0464    0.8288     0.7824
+
+Done. Script: topic_a_tanh.py
+End time: Sun Feb 22 18:00:28 EST 2026

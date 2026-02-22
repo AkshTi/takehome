@@ -1,0 +1,24 @@
+/var/spool/slurmd/job9560111/slurm_script: line 14: activate: No such file or directory
+  0%|          | 0.00/9.91M [00:00<?, ?B/s] 32%|███▏      | 3.15M/9.91M [00:00<00:00, 29.2MB/s]100%|██████████| 9.91M/9.91M [00:00<00:00, 69.8MB/s]
+Traceback (most recent call last):
+  File "/orcd/home/002/akshatat/takehome/takehome_20260128/topic_a_temperature.py", line 445, in <module>
+    train_ds, test_ds = get_mnist()
+  File "/orcd/home/002/akshatat/takehome/takehome_20260128/topic_a_temperature.py", line 169, in get_mnist
+    datasets.MNIST(root, download=True, train=True,  transform=tfm),
+  File "/home/akshatat/.conda/envs/mech_interp_gpu/lib/python3.10/site-packages/torchvision/datasets/mnist.py", line 100, in __init__
+    self.download()
+  File "/home/akshatat/.conda/envs/mech_interp_gpu/lib/python3.10/site-packages/torchvision/datasets/mnist.py", line 188, in download
+    download_and_extract_archive(url, download_root=self.raw_folder, filename=filename, md5=md5)
+  File "/home/akshatat/.conda/envs/mech_interp_gpu/lib/python3.10/site-packages/torchvision/datasets/utils.py", line 399, in download_and_extract_archive
+    extract_archive(archive, extract_root, remove_finished)
+  File "/home/akshatat/.conda/envs/mech_interp_gpu/lib/python3.10/site-packages/torchvision/datasets/utils.py", line 364, in extract_archive
+    ret_path = _decompress(
+  File "/home/akshatat/.conda/envs/mech_interp_gpu/lib/python3.10/site-packages/torchvision/datasets/utils.py", line 325, in _decompress
+    wfh.write(rfh.read())
+  File "/home/akshatat/.conda/envs/mech_interp_gpu/lib/python3.10/gzip.py", line 301, in read
+    return self._buffer.read(size)
+  File "/home/akshatat/.conda/envs/mech_interp_gpu/lib/python3.10/_compression.py", line 118, in readall
+    while data := self.read(sys.maxsize):
+  File "/home/akshatat/.conda/envs/mech_interp_gpu/lib/python3.10/gzip.py", line 507, in read
+    raise EOFError("Compressed file ended before the "
+EOFError: Compressed file ended before the end-of-stream marker was reached

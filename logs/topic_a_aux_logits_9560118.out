@@ -1,0 +1,121 @@
+Job ID:     9560118
+Node:       node3000
+GPU:        0
+Start time: Sun Feb 22 17:59:54 EST 2026
+Script      : topic_a_aux_logits.py
+Device      : cuda
+AUX_LOGITS  : [5, 10, 20, 30, 40, 50]
+TOTAL_OUT   : 60  (fixed; teacher shared across n_aux)
+Temperature : 2.0  (fixed, T² loss scaling applied)
+Seeds       : [0, 1, 2]   N_MODELS=25
+
+=================================================================
+  SEED 0
+=================================================================
+  teacher acc mean: 0.9430
+  → n_aux=5
+    dfi ghost_rand last L2: 0.1808
+  → n_aux=10
+    dfi ghost_rand last L2: 0.3222
+  → n_aux=20
+    dfi ghost_rand last L2: 0.5407
+  → n_aux=30
+    dfi ghost_rand last L2: 0.7597
+  → n_aux=40
+    dfi ghost_rand last L2: 0.9422
+  → n_aux=50
+    dfi ghost_rand last L2: 1.1676
+
+=================================================================
+  SEED 1
+=================================================================
+  teacher acc mean: 0.9433
+  → n_aux=5
+    dfi ghost_rand last L2: 0.1802
+  → n_aux=10
+    dfi ghost_rand last L2: 0.3138
+  → n_aux=20
+    dfi ghost_rand last L2: 0.5530
+  → n_aux=30
+    dfi ghost_rand last L2: 0.7666
+  → n_aux=40
+    dfi ghost_rand last L2: 0.9594
+  → n_aux=50
+    dfi ghost_rand last L2: 1.1793
+
+=================================================================
+  SEED 2
+=================================================================
+  teacher acc mean: 0.9435
+  → n_aux=5
+    dfi ghost_rand last L2: 0.1840
+  → n_aux=10
+    dfi ghost_rand last L2: 0.3230
+  → n_aux=20
+    dfi ghost_rand last L2: 0.5511
+  → n_aux=30
+    dfi ghost_rand last L2: 0.7727
+  → n_aux=40
+    dfi ghost_rand last L2: 0.9567
+  → n_aux=50
+    dfi ghost_rand last L2: 1.1612
+
+Raw accuracy → plots_a/topic_a_aux_logits.py_accuracy.csv
+
+=================================================================
+ACCURACY SUMMARY (mean ± 95% CI across models × seeds)
+=================================================================
+
+Baselines (n_aux-independent):
+            mean  ±95%CI
+condition               
+Reference 0.1052  0.0025
+Teacher   0.9433  0.0002
+
+Per-n_aux results:
+                                       mean  ±95%CI
+n_aux condition                                    
+5     Student (all)                  0.9297  0.0006
+      Student (ghost)                0.1903  0.0139
+      Student (ghost, rand. teacher) 0.1030  0.0044
+10    Student (all)                  0.9293  0.0005
+      Student (ghost)                0.2390  0.0180
+      Student (ghost, rand. teacher) 0.1028  0.0051
+20    Student (all)                  0.9287  0.0005
+      Student (ghost)                0.3733  0.0260
+      Student (ghost, rand. teacher) 0.1024  0.0046
+30    Student (all)                  0.9283  0.0005
+      Student (ghost)                0.4648  0.0271
+      Student (ghost, rand. teacher) 0.1009  0.0044
+40    Student (all)                  0.9280  0.0006
+      Student (ghost)                0.5573  0.0248
+      Student (ghost, rand. teacher) 0.1021  0.0059
+50    Student (all)                  0.9280  0.0005
+      Student (ghost)                0.6327  0.0248
+      Student (ghost, rand. teacher) 0.1012  0.0052
+
+Figure saved → plots_a/topic_a_aux_logits.py_accuracy.png
+Figure saved → plots_a/topic_a_aux_logits.py_gradnorm_ghost.png
+Figure saved → plots_a/topic_a_aux_logits.py_dist_from_init_ghost.png
+Figure saved → plots_a/topic_a_aux_logits.py_gradnorm_all.png
+Figure saved → plots_a/topic_a_aux_logits.py_dist_from_init_all.png
+Figure saved → plots_a/topic_a_aux_logits.py_gradnorm_ghost_rand.png
+Figure saved → plots_a/topic_a_aux_logits.py_dist_from_init_ghost_rand.png
+Figure saved → plots_a/topic_a_aux_logits.py_metrics_vs_aux.png
+Figure saved → plots_a/topic_a_aux_logits.py_loss_curves.png
+
+Dynamics data → plots_a/topic_a_aux_logits.py_dynamics.csv
+
+=================================================================
+SUBLIMINAL LEARNING SIGNAL
+=================================================================
+   n_aux     ghost       all  ghost_rand   ghost−ref   all−ref  all−ghost
+       5    0.1903    0.9297      0.1030      0.0851    0.8245     0.7394
+      10    0.2390    0.9293      0.1028      0.1338    0.8241     0.6903
+      20    0.3733    0.9287      0.1024      0.2681    0.8235     0.5555
+      30    0.4648    0.9283      0.1009      0.3596    0.8232     0.4636
+      40    0.5573    0.9280      0.1021      0.4522    0.8228     0.3706
+      50    0.6327    0.9280      0.1012      0.5276    0.8228     0.2953
+
+Done. Script: topic_a_aux_logits.py
+End time: Sun Feb 22 18:01:15 EST 2026

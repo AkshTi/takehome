@@ -1,0 +1,17 @@
+Job ID:     9560111
+Node:       node3000
+GPU:        0
+Start time: Sun Feb 22 17:58:54 EST 2026
+Script : topic_a_temperature.py
+Device : cuda
+Temperatures : [0, 0.5, 1, 2, 4, 8]
+Seeds  : [0, 1, 2]   N_MODELS=25
+Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-images-idx3-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-images-idx3-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw/train-images-idx3-ubyte.gz
+Extracting /home/akshatat/.pytorch/MNIST_data/MNIST/raw/train-images-idx3-ubyte.gz to /home/akshatat/.pytorch/MNIST_data/MNIST/raw
+
+End time: Sun Feb 22 17:59:12 EST 2026
