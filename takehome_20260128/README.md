@@ -30,11 +30,12 @@ In "Comments & Extensions of Subliminal Learning" the authors found the followin
 
 Below, propose at least five other factors that you could vary, and preregister your prediction about whether they would increase or decrease the subliminal learning effect and why. (Don't spend more than 5 minutes on this. You won't be graded on whether your predictions are correct - we just want to see your thought process evolve) 
 
-5) TODO
-6) TODO
-7) TODO
-8) TODO
-9) TODO
+5) Increasing accuracy of the teacher model (i.e. training on more epochs) -> this would cause increase in subliminal learning
+6) Add regularization in loss function -> decrease in subliminal learning 
+7) Test out of distribution inputs ( train on MNIST, test on fashionMNIST ) -> still works
+8) Vary the temperature (T) applied to softmax for logits -> increase temperature scaling with T
+9) Vary the learning rate of the student -> higher learning rate, more subliminal learning
+10) varying the activation function of the student and changing from relu to tanh -> decrease
 
 ### Step 2
 
