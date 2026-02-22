@@ -294,6 +294,15 @@ if __name__ == "__main__":
     teacher.load_state_dict(reference_42.state_dict())
     train(teacher, train_x, train_y, EPOCHS_TEACHER)
 
+    # ── Frozen-weight verification 1: Wg, bg unchanged during teacher training ──
+    # CE loss only uses zd = Wd h + bd; gradients never reach zg = Wg h + bg.
+    ref42_last = reference_42.net[-1]
+    t_last     = teacher.net[-1]
+    wg_diff = (t_last.weight.data[:, 10:, :] - ref42_last.weight.data[:, 10:, :]).abs().max().item()
+    bg_diff = (t_last.bias.data[:,   10:]    - ref42_last.bias.data[:,   10:]   ).abs().max().item()
+    print(f"[VERIFY] Teacher training  max|W_g^after - W_g^init| = {wg_diff:.2e}  (should be ≈ 0)")
+    print(f"[VERIFY] Teacher training  max|b_g^after - b_g^init| = {bg_diff:.2e}  (should be ≈ 0)")
+
     with t.inference_mode():
         H_teacher = teacher.get_hidden(probe_x)   # (M, PROBE_SIZE, 256) — constant
     teach_acc = accuracy(teacher, probe_x, probe_y)
@@ -339,6 +348,20 @@ if __name__ == "__main__":
         distill_one_epoch(student_matched, teacher, rand_imgs, opt_matched)
         distill_one_epoch(student_control, teacher, rand_imgs, opt_control)
         log_epoch(epoch, student_matched, student_control)
+
+    # ── Frozen-weight verification 2: Wd, bd unchanged during student distillation ──
+    # KL loss only uses ghost indices; gradients never reach zd = Wd h + bd.
+    sm_last = student_matched.net[-1]
+    wd_diff_m = (sm_last.weight.data[:, :10, :] - ref42_last.weight.data[:, :10, :]).abs().max().item()
+    bd_diff_m = (sm_last.bias.data[:,   :10]    - ref42_last.bias.data[:,   :10]   ).abs().max().item()
+    sc_last = student_control.net[-1]
+    ref99_last = reference_99.net[-1]
+    wd_diff_c = (sc_last.weight.data[:, :10, :] - ref99_last.weight.data[:, :10, :]).abs().max().item()
+    bd_diff_c = (sc_last.bias.data[:,   :10]    - ref99_last.bias.data[:,   :10]   ).abs().max().item()
+    print(f"[VERIFY] Matched student distill   max|W_d^after - W_d^init| = {wd_diff_m:.2e}  (should be ≈ 0)")
+    print(f"[VERIFY] Matched student distill   max|b_d^after - b_d^init| = {bd_diff_m:.2e}  (should be ≈ 0)")
+    print(f"[VERIFY] Control student distill   max|W_d^after - W_d^init| = {wd_diff_c:.2e}  (should be ≈ 0)")
+    print(f"[VERIFY] Control student distill   max|b_d^after - b_d^init| = {bd_diff_c:.2e}  (should be ≈ 0)")
 
     df = pd.DataFrame(records)
 

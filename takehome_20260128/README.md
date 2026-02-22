@@ -79,7 +79,32 @@ Answer the following questions to the best of your ability. Run and document any
 - The conditions of the theorem do not strictly apply since we are doing multiple gradient steps.
 - Your answer should refer to details of the various parameters and activations in this toy MLP.
 
-The student achieves greater-than-chance accuracy despite an untrained classification head because the auxiliary logits act as a fixed, high-dimensional random projection ($W_{aux}$) of the teacher's learned hidden representations. By optimizing the student to match these auxiliary outputs across a wide input space (noise), the student is forced into representation alignment with the teacher. Because the teacher anchored its learned features to the shared initial state of the classification head ($W_{digits}$), the student can achieve cross-logit transfer: its recovered hidden representations naturally decode correctly through its own frozen, identically-initialized classification head.
+**Architecture notation.** The toy MLP computes
+
+$$h = \text{ReLU}(W_2\,\text{ReLU}(W_1 x + b_1) + b_2), \qquad z_d = W_d h + b_d, \qquad z_g = W_g h + b_g$$
+
+where $W_1 \in \mathbb{R}^{256\times784}$, $W_2 \in \mathbb{R}^{256\times256}$, $W_d \in \mathbb{R}^{10\times256}$ (digit head), $W_g \in \mathbb{R}^{3\times256}$ (ghost head). All matrices are initialised from Seed 42 for both teacher and student.
+
+**What is frozen — empirically verified.** Teacher training minimises cross-entropy over $z_d$ only, so gradients never enter $z_g = W_g h + b_g$. Consequently $W_g$ and $b_g$ remain exactly at their Seed-42 values after training (verified: `max|W_g^{after} - W_g^{init}| ≈ 0`). Student distillation minimises KL over ghost indices only, so gradients never enter $z_d = W_d h + b_d$. Consequently $W_d$ and $b_d$ remain exactly at their Seed-42 values after distillation (verified: `max|W_d^{after} - W_d^{init}| ≈ 0`). Both verifications are printed at runtime in `topic_a_head_swap.py` and `topic_a_shadow.py`.
+
+**Gradient route — how the body learns without digit supervision.** The distillation loss $\mathcal{L}$ depends on $z_g = W_g h$. By the chain rule:
+
+$$\frac{\partial \mathcal{L}}{\partial h} = W_g^\top \frac{\partial \mathcal{L}}{\partial z_g}$$
+
+This gradient is non-zero whenever the student's ghost logits diverge from the teacher's. Every gradient step reshapes $h$ — and therefore $W_1, W_2$ — through $W_g$, with no digit signal required.
+
+**Why chance-breaking happens.** A randomly initialised digit head $W_d^{(0)}$ is only "random" relative to an *unstructured* representation. Distillation reshapes $h^s$ toward the teacher's representation geometry, so $W_d^{(0)}$ becomes a useful linear probe. This is because the teacher's body was co-trained with $W_d$ evolving from the same Seed-42 starting point; the student recovering $h^s \approx h^t$ means the frozen $W_d^{(0)} = W_d^{t,\text{init}}$ is a consistent (if suboptimal) decoder.
+
+**Role of the shared seed — the anchor.** Shared initialisation pins teacher and student to the same coordinate system from epoch 0. With fixed readouts, gradient descent's implicit bias keeps the student near the teacher's solution manifold in representation space. This is demonstrated by Experiment A (`topic_a_head_swap.py`):
+- **Condition 3** (teacher's *trained* head on student's $h$): accuracy matches teacher ceiling — proving $h^s \approx h^t$.
+- **Condition 2** (fresh Seed-99 head on student's $h$): accuracy drops to chance — proving the decoding is specific to the Seed-42 anchor, not a property of $h^s$ in isolation.
+
+**Why this works across multiple gradient steps (not just single-step linearisation).** Theorem 1's single-step argument does not directly apply here. The empirical case from Experiment B (`topic_a_shadow.py`) is:
+- Linear CKA between $h^{\text{teacher}}$ and $h^{\text{student}}$ increases *monotonically* across distillation epochs.
+- MNIST accuracy rises *after* CKA rises — it is a downstream readout of representation alignment, not the driver.
+- A mismatched-seed control student (Seed 99), receiving identical distillation signal, stays near zero CKA and chance accuracy throughout — ruling out the explanation that distillation alone (without shared init) is sufficient.
+
+The multi-step story is: each gradient step uses $W_g^\top \nabla_{z_g}\mathcal{L}$ to push $h^s$ closer to $h^t$. This direction is stable because $W_g$ is shared at initialisation and changes slowly, so the signal is consistent across steps. The cumulative effect over 5–10 epochs produces near-perfect representational alignment.
 
 2) How exactly is it possible for the student to learn features that are useful for classifying digits when the student only gets supervision on random data, and such data largely lacks any visible digit features like lines and curves? Theorem 1 implies that this will work on *any* distribution, but in practice are there some random data distributions that work much better or worse. Why is this?
 

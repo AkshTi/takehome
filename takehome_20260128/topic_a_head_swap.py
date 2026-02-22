@@ -171,10 +171,19 @@ def train(model, x, y, epochs: int):
             opt.zero_grad(); loss.backward(); opt.step()
 
 
-def distill(student, teacher, idx, src_x, epochs: int):
+STEPS_PER_EPOCH = len(range(0, 60_000, BATCH_SIZE))  # = 60000 // BATCH_SIZE
+
+
+def distill(student, teacher, idx, epochs: int):
+    """
+    Distil student toward teacher on ghost logits using on-the-fly noise.
+    Noise is generated fresh each step — no pre-allocation of a giant tensor.
+    bx shape: (N_MODELS, BATCH_SIZE, 1, 28, 28)
+    """
     opt = t.optim.Adam(student.parameters(), lr=LR)
     for _ in tqdm.trange(epochs, desc="distill student"):
-        for (bx,) in PreloadedDataLoader(src_x, None, BATCH_SIZE):
+        for _ in range(STEPS_PER_EPOCH):
+            bx = t.rand(N_MODELS, BATCH_SIZE, 1, 28, 28, device=DEVICE) * 2 - 1
             with t.no_grad():
                 tgt = teacher(bx)[:, :, idx]
             out = student(bx)[:, :, idx]
@@ -225,7 +234,6 @@ if __name__ == "__main__":
     test_x_s,  test_y  = to_tensor(test_ds)
     train_x = train_x_s.unsqueeze(0).expand(N_MODELS, -1, -1, -1, -1)
     test_x  = test_x_s.unsqueeze(0).expand(N_MODELS, -1, -1, -1, -1)
-    rand_imgs = t.rand_like(train_x) * 2 - 1  # uniform noise for distillation
 
     layer_sizes = [28 * 28, 256, 256, TOTAL_OUT]
 
@@ -242,13 +250,34 @@ if __name__ == "__main__":
     teach_acc = accuracy(teacher, test_x, test_y)
     print(f"Teacher accuracy: {np.mean(teach_acc):.3f}")
 
+    # ── Frozen-weight verification 1: Wg, bg must be unchanged after teacher training ──
+    # Teacher CE loss only touches zd = Wd h + bd; gradients never reach zg = Wg h + bg.
+    ref_last = reference.net[-1]
+    t_last   = teacher.net[-1]
+    wg_diff = (t_last.weight.data[:, 10:, :] - ref_last.weight.data[:, 10:, :]).abs().max().item()
+    bg_diff = (t_last.bias.data[:,   10:]    - ref_last.bias.data[:,   10:]   ).abs().max().item()
+    print(f"[VERIFY] Teacher training  max|W_g^after - W_g^init| = {wg_diff:.2e}  (should be ≈ 0)")
+    print(f"[VERIFY] Teacher training  max|b_g^after - b_g^init| = {bg_diff:.2e}  (should be ≈ 0)")
+    assert wg_diff < 1e-8 and bg_diff < 1e-8, \
+        f"Ghost weights changed during teacher training! wg={wg_diff:.2e} bg={bg_diff:.2e}"
+
     # ── Student: distilled on ghost logits only, from same Seed-42 init ───────
     # The distillation loop only touches GHOST_IDX (rows 10, 11, 12 of the last
     # layer).  Rows 0-9 (the digit head) receive ZERO gradient and stay frozen
     # at the Seed-42 random values.
     student = MultiClassifier(N_MODELS, layer_sizes).to(DEVICE)
     student.load_state_dict(reference.state_dict())
-    distill(student, teacher, GHOST_IDX, rand_imgs, EPOCHS_DISTILL)
+    distill(student, teacher, GHOST_IDX, EPOCHS_DISTILL)
+
+    # ── Frozen-weight verification 2: Wd, bd must be unchanged after student distillation ──
+    # Student KL loss only touches zg indices; gradients never reach zd = Wd h + bd.
+    s_last = student.net[-1]
+    wd_diff = (s_last.weight.data[:, :10, :] - ref_last.weight.data[:, :10, :]).abs().max().item()
+    bd_diff = (s_last.bias.data[:,   :10]    - ref_last.bias.data[:,   :10]   ).abs().max().item()
+    print(f"[VERIFY] Student distill   max|W_d^after - W_d^init| = {wd_diff:.2e}  (should be ≈ 0)")
+    print(f"[VERIFY] Student distill   max|b_d^after - b_d^init| = {bd_diff:.2e}  (should be ≈ 0)")
+    assert wd_diff < 1e-8 and bd_diff < 1e-8, \
+        f"Digit weights changed during student distillation! wd={wd_diff:.2e} bd={bd_diff:.2e}"
 
     # ── Extract the three candidate digit heads ───────────────────────────────
     # Student's last layer: MultiLinear with weight shape (M, TOTAL_OUT, 256)
