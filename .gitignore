@@ -1,0 +1,31 @@
+# Datasets / caches (keep Cline away from big files)
+data/
+dataset/
+datasets/
+mnist/
+MNIST/
+
+# Hugging Face cache if it ever ends up inside repo
+.cache/
+**/.cache/huggingface/
+**/.cache/hf/
+
+# TorchVision MNIST structure
+**/MNIST/raw/
+**/MNIST/processed/
+
+# Common large/binary artifacts
+*.pt
+*.pth
+*.npz
+*.npy
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.tfrecord*
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
