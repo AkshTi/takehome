@@ -45,9 +45,25 @@ Pick at least 3 out of the 9+ items above and implement and run the experiments.
 
 [TODO](link_to_figure.png)
 
-#### Experiment 2:
+#### Experiment 2: Activation Function — ReLU vs Tanh
 
-[TODO](link_to_figure.png)
+**Script:** `topic_a_tanh.py` (identical to `topic_a_temperature.py` except `nn.ReLU()` → `nn.Tanh()`)
+
+**Motivation:** ReLU kills negative activations and can produce dead units, which may suppress gradient flow during distillation. Tanh is smooth, zero-centred, and passes gradient for all activations. Switching to Tanh lets us test whether the smoothness and symmetry of the activation function affects how much subliminal signal propagates through the student.
+
+**Setup:** Same temperature sweep (`T ∈ {0, 0.5, 1, 2, 4, 8}`), same three student conditions (ghost, all, ghost_rand), same seeds (0–2), same N_MODELS=25. The only code change is the activation function in the hidden layers.
+
+**Metrics:** Test accuracy, per-layer grad norm, per-layer distance-from-init, and distillation loss — all reported identically to Experiment 1 so results are directly comparable.
+
+**Key outputs:**
+- `plots_a/topic_a_tanh.py_accuracy.png` — accuracy vs temperature, Tanh activation
+- `plots_a/topic_a_tanh.py_gradnorm_*.png` — per-layer, per-epoch grad norms
+- `plots_a/topic_a_tanh.py_dist_from_init_*.png` — per-layer distance from init
+- `plots_a/topic_a_tanh.py_loss_curves.png` — distillation loss per epoch
+- `plots_a/topic_a_tanh.py_metrics_vs_temp.png` — summary metrics vs temperature
+- `plots_a/topic_a_tanh.py_accuracy.csv`, `plots_a/topic_a_tanh.py_dynamics.csv`
+
+**Prediction:** Tanh will decrease subliminal learning relative to ReLU. Because Tanh saturates symmetrically, its gradients vanish near ±1 — this limits how much the distillation signal reshapes the hidden representations, reducing the amount of information the student absorbs from ghost channels.
 
 #### Experiment 3:
 
@@ -63,7 +79,7 @@ Answer the following questions to the best of your ability. Run and document any
 - The conditions of the theorem do not strictly apply since we are doing multiple gradient steps.
 - Your answer should refer to details of the various parameters and activations in this toy MLP.
 
-TODO
+The student achieves greater-than-chance accuracy despite an untrained classification head because the auxiliary logits act as a fixed, high-dimensional random projection ($W_{aux}$) of the teacher's learned hidden representations. By optimizing the student to match these auxiliary outputs across a wide input space (noise), the student is forced into representation alignment with the teacher. Because the teacher anchored its learned features to the shared initial state of the classification head ($W_{digits}$), the student can achieve cross-logit transfer: its recovered hidden representations naturally decode correctly through its own frozen, identically-initialized classification head.
 
 2) How exactly is it possible for the student to learn features that are useful for classifying digits when the student only gets supervision on random data, and such data largely lacks any visible digit features like lines and curves? Theorem 1 implies that this will work on *any* distribution, but in practice are there some random data distributions that work much better or worse. Why is this?
 

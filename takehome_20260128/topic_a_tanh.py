@@ -1,22 +1,30 @@
 """
-Topic A – Experiment 1: Temperature Scaling and Subliminal Learning
-====================================================================
-Derived from topic_a.py.
+Topic A – Experiment 2: Activation Function (Tanh) and Subliminal Learning
+===========================================================================
+Derived from topic_a_temperature.py.
 
-Varies the softmax temperature T ∈ {0, 0.5, 1, 2, 4, 8} applied to teacher
-and student logits before the KL-divergence distillation loss.
+Identical to the temperature experiment in every way except that the hidden-
+layer activation is Tanh instead of ReLU.  Temperature is still swept over
+the same values so results are directly comparable to the ReLU baseline.
 
-    T = 0  →  hard one-hot targets: tgt = one_hot(argmax(teacher logits))
-               student log-softmax at T=1 (no division).
-    T > 0  →  tgt      = softmax(teacher_logits / T)
-               student  = log_softmax(student_logits / T)
-               loss     = KL(student || tgt, batchmean) * T²
-               T² rescales gradients back to T=1 magnitude (Hinton et al. 2015).
-               Without it, high-T grad norms would shrink trivially by 1/T².
+    ReLU  (topic_a_temperature.py) : f(x) = max(0, x)
+                                       – kills negative activations
+                                       – can suppress gradient flow (dead units)
+    Tanh  (this script)             : f(x) = tanh(x)
+                                       – smooth, saturating, zero-centred
+                                       – passes gradient for all activations
 
-T=1 is the standard distillation baseline.  T=0.5 probes the sharper-than-
-normal regime.  Including T=1 makes every other value interpretable relative
-to a known reference.
+Code changes from topic_a_temperature.py
+-----------------------------------------
+1. mlp(): nn.ReLU() → nn.Tanh()   ← the activation change under study
+2. torch.cuda.manual_seed_all(seed) added alongside t.manual_seed(seed).
+3. cudnn.benchmark=False, cudnn.deterministic=True for full reproducibility.
+4. RNG state (CPU + CUDA) is saved and restored before each distill_with_temp
+   call so ghost / all / ghost_rand see identical batch orderings — isolating
+   the distillation signal rather than batch-order variance.
+
+Model init is intentionally identical to the ReLU baseline (same seed, same
+reference.state_dict() copy) so the only controlled variable is the activation.
 
 Students
 --------
@@ -39,10 +47,7 @@ Per-epoch, per-MLP-layer logging
 ---------------------------------
     grad_norm       mean_m [ sqrt(||∇W||_F² + ||∇b||²) ]  avg over batches
     dist_from_init  mean_m [ sqrt(||W−W₀||_F² + ||b−b₀||²) ] after opt.step
-                    makes "parameter matrices changed" claim defensible
     loss            mean batch loss (KL × T² for T>0 ; NLL for T=0)
-                    needed to interpret grad-norm changes; without it, a drop
-                    in grad norm is ambiguous (convergence vs weak signal).
 
 Subliminal signal reported as
 ------------------------------
@@ -135,7 +140,7 @@ def mlp(n_models: int, sizes: Sequence[int]) -> nn.Sequential:
     for i, (d_in, d_out) in enumerate(zip(sizes, sizes[1:])):
         layers.append(MultiLinear(n_models, d_in, d_out))
         if i < len(sizes) - 2:
-            layers.append(nn.ReLU())
+            layers.append(nn.Tanh())  # ← only change from topic_a_temperature.py
     return nn.Sequential(*layers)
 
 
@@ -396,7 +401,7 @@ def _epoch_grid_plot(
     )
     fig.suptitle(
         f"{y_label} per layer per epoch — {cond_title}\n"
-        f"(mean ± 1 std, {len(SEEDS)} seeds)",
+        f"(mean ± 1 std, {len(SEEDS)} seeds, Tanh activation)",
         fontsize=12, y=1.01,
     )
     for row, layer_lbl in enumerate(LAYER_LABELS):
@@ -439,6 +444,7 @@ if __name__ == "__main__":
 
     print(f"Script : {script_name}")
     print(f"Device : {DEVICE}")
+    print(f"Activation : Tanh")
     print(f"Temperatures : {TEMPERATURES}")
     print(f"Seeds  : {SEEDS}   N_MODELS={N_MODELS}")
 
@@ -534,6 +540,13 @@ if __name__ == "__main__":
             gn_gr, dfi_gr, loss_gr = distill_with_temp(
                 student_ghost_rand, rand_teacher, GHOST_IDX, train_x, EPOCHS_DISTILL, temperature)
 
+            # Sanity: rand_teacher control must show non-zero signal
+            _gr_loss0 = loss_gr[0]
+            _gr_dfi0  = dfi_gr[-1][LAYER_LABELS[0]]
+            assert _gr_loss0 > 0,  f"ghost_rand loss is 0 at T={temperature} seed={seed}"
+            assert _gr_dfi0  > 0,  f"ghost_rand dist_from_init is 0 at T={temperature} seed={seed}"
+            print(f"    [sanity] ghost_rand loss={_gr_loss0:.4f}  dfi_L0={_gr_dfi0:.4f}  ✓")
+
             for cond_key, gn, dfi, loss_ep in [
                 ("ghost",      gn_g,  dfi_g,  loss_g),
                 ("all",        gn_a,  dfi_a,  loss_a),
@@ -620,7 +633,7 @@ if __name__ == "__main__":
     ax.set_xticklabels([str(T) for T in TEMPERATURES], fontsize=12)
     ax.set_xlabel("Distillation temperature T", fontsize=13)
     ax.set_ylabel("Test accuracy", fontsize=13)
-    ax.set_title("Effect of distillation temperature on subliminal learning",
+    ax.set_title("Effect of distillation temperature on subliminal learning (Tanh activation)",
                  fontsize=13)
     ax.legend(fontsize=9, loc="lower right")
     ax.yaxis.grid(True, alpha=0.3)
@@ -687,7 +700,7 @@ if __name__ == "__main__":
         ax.set_xticks(TEMPERATURES)
 
     plt.suptitle(
-        "Layer-wise grad-norm and dist-from-init vs temperature",
+        "Layer-wise grad-norm and dist-from-init vs temperature (Tanh activation)",
         fontsize=13,
     )
     plt.tight_layout()
@@ -729,7 +742,7 @@ if __name__ == "__main__":
         ax.set_xticks(epochs_ax)
 
     plt.suptitle(
-        "Distillation loss per epoch per temperature\n"
+        "Distillation loss per epoch per temperature — Tanh activation\n"
         "(KL×T² for T>0; NLL at teacher argmax for T=0)",
         fontsize=12,
     )
