@@ -15,16 +15,20 @@ Training:
   2. Student: starts from SAME Seed-42 init, distilled on ghost logits (GHOST_IDX)
               using random noise images.  The digit head receives NO gradient.
 
-Three evaluation conditions on the same trained Student body:
+Four evaluation conditions:
+  Condition 0 – Sanity anchor:   Teacher's hidden reps + Seed-42 INIT digit head.
+                                  If high, it shows teacher training co-adapts body
+                                  and head from the same origin, making the init
+                                  head a valid (suboptimal) decoder of h_teacher.
   Condition 1 – Baseline:        Student's own digit head (frozen at Seed 42)
   Condition 2 – Broken Anchor:   Fresh random digit head  (Seed 99)
   Condition 3 – Perfect Decoder: Teacher's *trained* digit head
 
 Expected results:
-  Condition 1 ~80%+  — student decoded through the shared anchor
-  Condition 2 ~10%   — random projection cannot decode aligned hidden reps
-  Condition 3 ~98%   — teacher's head works perfectly on student's hidden reps,
-                        proving hidden-layer alignment is complete
+  Condition 0 ~60-80% — teacher's reps already partially decodable through init head
+  Condition 1 ~80%+   — student decoded through shared anchor (≈ Cond 0, since h_s ≈ h_t)
+  Condition 2 ~10%    — random projection cannot decode aligned hidden reps
+  Condition 3 ~98%    — teacher's trained head works on student's reps → h_s ≈ h_t
 """
 import math
 import os
@@ -116,7 +120,7 @@ def get_mnist():
     tfm = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
     )
-    root = "~/.pytorch/MNIST_data/"
+    root = os.path.expanduser("~/.pytorch/MNIST_data/")
     return (
         datasets.MNIST(root, download=True, train=True,  transform=tfm),
         datasets.MNIST(root, download=True, train=False, transform=tfm),
@@ -171,18 +175,17 @@ def train(model, x, y, epochs: int):
             opt.zero_grad(); loss.backward(); opt.step()
 
 
-STEPS_PER_EPOCH = len(range(0, 60_000, BATCH_SIZE))  # = 60000 // BATCH_SIZE
-
-
-def distill(student, teacher, idx, epochs: int):
+def distill(student, teacher, idx, epochs: int, steps_per_epoch: int):
     """
     Distil student toward teacher on ghost logits using on-the-fly noise.
     Noise is generated fresh each step — no pre-allocation of a giant tensor.
     bx shape: (N_MODELS, BATCH_SIZE, 1, 28, 28)
+    steps_per_epoch = ceil(len(train_ds) / BATCH_SIZE), passed from __main__
+    after the dataset is loaded so we use the real dataset length.
     """
     opt = t.optim.Adam(student.parameters(), lr=LR)
     for _ in tqdm.trange(epochs, desc="distill student"):
-        for _ in range(STEPS_PER_EPOCH):
+        for _ in range(steps_per_epoch):
             bx = t.rand(N_MODELS, BATCH_SIZE, 1, 28, 28, device=DEVICE) * 2 - 1
             with t.no_grad():
                 tgt = teacher(bx)[:, :, idx]
@@ -225,6 +228,7 @@ def ci_95(arr):
 if __name__ == "__main__":
     # ── Data ──────────────────────────────────────────────────────────────────
     train_ds, test_ds = get_mnist()
+    steps_per_epoch = math.ceil(len(train_ds) / BATCH_SIZE)
 
     def to_tensor(ds):
         xs, ys = zip(*ds)
@@ -267,7 +271,7 @@ if __name__ == "__main__":
     # at the Seed-42 random values.
     student = MultiClassifier(N_MODELS, layer_sizes).to(DEVICE)
     student.load_state_dict(reference.state_dict())
-    distill(student, teacher, GHOST_IDX, EPOCHS_DISTILL)
+    distill(student, teacher, GHOST_IDX, EPOCHS_DISTILL, steps_per_epoch)
 
     # ── Frozen-weight verification 2: Wd, bd must be unchanged after student distillation ──
     # Student KL loss only touches zg indices; gradients never reach zd = Wd h + bd.
@@ -279,10 +283,21 @@ if __name__ == "__main__":
     assert wd_diff < 1e-8 and bd_diff < 1e-8, \
         f"Digit weights changed during student distillation! wd={wd_diff:.2e} bd={bd_diff:.2e}"
 
-    # ── Extract the three candidate digit heads ───────────────────────────────
+    # ── Extract the four candidate digit heads ────────────────────────────────
     # Student's last layer: MultiLinear with weight shape (M, TOTAL_OUT, 256)
     #   digit rows = [:, 0:10, :]   ghost rows = [:, 10:, :]
     student_last = student.net[-1]   # the final MultiLinear
+
+    # Condition 0 – Sanity anchor: teacher hidden reps + Seed-42 INIT digit head
+    # This checks whether the teacher's trained hidden reps are already decodable
+    # through the frozen Seed-42 head (before any head training).  If high, it
+    # confirms the mechanism: teacher training co-adapts body+head from Seed 42,
+    # making the init head a valid (if suboptimal) linear decoder of h_teacher.
+    # The student wins because distillation forces h_student ≈ h_teacher, so the
+    # same frozen head decodes both.  This rules out "lucky random head" as the
+    # explanation — the head is lucky precisely because it shared the teacher's init.
+    cond0_w = ref_last.weight.data[:, :10, :].clone()   # (M, 10, 256) — Seed-42 init
+    cond0_b = ref_last.bias.data[:,   :10   ].clone()   # (M, 10)
 
     # Condition 1 – Baseline: student's own digit head (frozen at Seed 42)
     cond1_w = student_last.weight.data[:, :10, :].clone()   # (M, 10, 256)
@@ -304,15 +319,18 @@ if __name__ == "__main__":
     cond3_b = teacher_last.bias.data[:,   :10   ].clone()   # (M, 10)
 
     # ── Evaluate ──────────────────────────────────────────────────────────────
+    # Cond 0 is evaluated on the TEACHER's hidden reps (not the student's)
+    acc_c0 = accuracy_with_head(teacher, test_x, test_y, cond0_w, cond0_b)
     acc_c1 = accuracy_with_head(student, test_x, test_y, cond1_w, cond1_b)
     acc_c2 = accuracy_with_head(student, test_x, test_y, cond2_w, cond2_b)
     acc_c3 = accuracy_with_head(student, test_x, test_y, cond3_w, cond3_b)
 
     df = pd.DataFrame({
-        "Teacher (ceiling)":             teach_acc,
-        "Cond 1 – Own head (Seed 42)":   acc_c1,
-        "Cond 2 – Random head (Seed 99)": acc_c2,
-        "Cond 3 – Teacher's trained head": acc_c3,
+        "Teacher (ceiling)":                    teach_acc,
+        "Cond 0 – Teacher h + init head":       acc_c0,
+        "Cond 1 – Student h + own head (S42)":  acc_c1,
+        "Cond 2 – Student h + random (S99)":    acc_c2,
+        "Cond 3 – Student h + teacher head":    acc_c3,
     })
     res = df.agg(["mean", ci_95]).T
     print("\n=== Head Swap Ablation Results ===")
@@ -322,8 +340,9 @@ if __name__ == "__main__":
     os.makedirs("plots_a", exist_ok=True)
     script_name = os.path.basename(__file__)
 
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    colors = ["C5", "C0", "C3", "C2"]
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    # Teacher ceiling (grey), Cond0 (olive), Cond1 (blue), Cond2 (red), Cond3 (green)
+    colors = ["#7f7f7f", "#bcbd22", "#1f77b4", "#d62728", "#2ca02c"]
     labels = list(res.index)
     x_pos  = np.arange(len(labels))
 
@@ -331,15 +350,17 @@ if __name__ == "__main__":
            color=colors, width=0.6, edgecolor="black", linewidth=0.7)
 
     ax.axhline(0.10, ls=":", color="dimgray", linewidth=1.2, label="Chance (10 %)")
-    ax.axhline(res.loc["Teacher (ceiling)", "mean"], ls="--", color="C5",
+    ax.axhline(res.loc["Teacher (ceiling)", "mean"], ls="--", color="#7f7f7f",
                linewidth=1.2, label="Teacher ceiling")
 
     ax.set_xticks(x_pos)
-    ax.set_xticklabels(labels, rotation=20, ha="right", fontsize=11)
+    ax.set_xticklabels(labels, rotation=20, ha="right", fontsize=10)
     ax.set_ylabel("MNIST Test Accuracy", fontsize=13)
-    ax.set_title("Head Swap Ablation\n"
-                 "Same student body, three different classification heads",
-                 fontsize=13)
+    ax.set_title(
+        "Head Swap Ablation — same hidden body, four readout heads\n"
+        "Cond 0: teacher reps + init head  |  Cond 1–3: student reps",
+        fontsize=12,
+    )
     ax.set_ylim(0, 1.08)
     ax.yaxis.grid(True, alpha=0.3)
     ax.legend(fontsize=10)
