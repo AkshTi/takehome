@@ -1,0 +1,30 @@
+Job ID:     9561159
+Node:       node3001
+GPU:        0
+Start time: Sun Feb 22 18:45:55 EST 2026
+[VERIFY] Teacher  max|W_g^after - W_g^init| = 0.00e+00  (should be ≈ 0)
+[VERIFY] Teacher  max|b_g^after - b_g^init| = 0.00e+00  (should be ≈ 0)
+Teacher accuracy (probe): 0.941
+  Epoch  0 | Matched  acc=0.094  th=0.132  cos=0.638  cka=0.658 | Control  acc=0.102  th=0.095
+
+Distilling students epoch-by-epoch …
+  Epoch  1 | Matched  acc=0.182  th=0.273  cos=0.709  cka=0.751 | Control  acc=0.098  th=0.104  loss_m=2.9838  loss_c=22.4755
+  Epoch  2 | Matched  acc=0.317  th=0.442  cos=0.774  cka=0.821 | Control  acc=0.098  th=0.104  loss_m=1.7446  loss_c=11.7235
+  Epoch  3 | Matched  acc=0.468  th=0.592  cos=0.823  cka=0.879 | Control  acc=0.095  th=0.105  loss_m=1.3827  loss_c=10.6130
+  Epoch  4 | Matched  acc=0.590  th=0.689  cos=0.859  cka=0.915 | Control  acc=0.094  th=0.103  loss_m=1.1071  loss_c=10.0239
+  Epoch  5 | Matched  acc=0.673  th=0.762  cos=0.885  cka=0.938 | Control  acc=0.091  th=0.101  loss_m=0.8948  loss_c=9.5465
+  Epoch  6 | Matched  acc=0.734  th=0.809  cos=0.905  cka=0.952 | Control  acc=0.090  th=0.101  loss_m=0.7291  loss_c=9.2073
+  Epoch  7 | Matched  acc=0.783  th=0.848  cos=0.920  cka=0.963 | Control  acc=0.090  th=0.104  loss_m=0.6042  loss_c=8.8940
+  Epoch  8 | Matched  acc=0.822  th=0.869  cos=0.933  cka=0.970 | Control  acc=0.093  th=0.106  loss_m=0.5067  loss_c=8.6624
+  Epoch  9 | Matched  acc=0.846  th=0.884  cos=0.943  cka=0.976 | Control  acc=0.092  th=0.105  loss_m=0.4309  loss_c=8.4391
+  Epoch 10 | Matched  acc=0.861  th=0.898  cos=0.951  cka=0.980 | Control  acc=0.094  th=0.106  loss_m=0.3706  loss_c=8.2959
+[VERIFY] Matched  max|W_d^after - W_d^init| = 0.00e+00  max|b_d| = 0.00e+00  max|W_g| = 0.00e+00
+[VERIFY] Control  max|W_d^after - W_d^init| = 0.00e+00  max|W_g| = 0.00e+00
+
+Plot saved to plots_a/topic_a_shadow.py_shadow.png
+Data saved to plots_a/topic_a_shadow.py_shadow.csv
+
+=== Final epoch summary ===
+ epoch   acc_m  acc_m_ci  acc_m_th  acc_m_th_ci    cos_m  cos_m_ci    cka_m  cka_m_ci   acc_c  acc_c_ci  acc_c_th  acc_c_th_ci    cos_c  cos_c_ci    cka_c  cka_c_ci   loss_m   loss_c
+    10 0.86144  0.015779   0.89776     0.012592 0.951185  0.002365 0.979733  0.001449 0.09392  0.010617   0.10592     0.012106 0.377117  0.010047 0.652066  0.025139 0.370629 8.295891
+End time: Sun Feb 22 18:46:19 EST 2026

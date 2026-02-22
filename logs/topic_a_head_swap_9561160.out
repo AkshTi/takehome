@@ -1,0 +1,20 @@
+Job ID:     9561160
+Node:       node3301
+GPU:        0
+Start time: Sun Feb 22 18:45:55 EST 2026
+Teacher accuracy: 0.943
+[VERIFY] Teacher training  max|W_g^after - W_g^init| = 0.00e+00  (should be ≈ 0)
+[VERIFY] Teacher training  max|b_g^after - b_g^init| = 0.00e+00  (should be ≈ 0)
+[VERIFY] Student distill   max|W_d^after - W_d^init| = 0.00e+00  (should be ≈ 0)
+[VERIFY] Student distill   max|b_d^after - b_d^init| = 0.00e+00  (should be ≈ 0)
+
+=== Head Swap Ablation Results ===
+                                         mean     ci_95
+Teacher (ceiling)                    0.943032  0.000691
+Cond 0 – Teacher h + init head       0.930648  0.002953
+Cond 1 – Student h + own head (S42)  0.682024  0.032186
+Cond 2 – Student h + random (S99)    0.108080  0.014067
+Cond 3 – Student h + teacher head    0.767064  0.023784
+
+Plot saved to plots_a/topic_a_head_swap.py_head_swap.png
+End time: Sun Feb 22 18:46:12 EST 2026
