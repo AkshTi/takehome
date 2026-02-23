@@ -79,7 +79,7 @@ Answer the following questions to the best of your ability. Run and document any
 - The conditions of the theorem do not strictly apply since we are doing multiple gradient steps.
 - Your answer should refer to details of the various parameters and activations in this toy MLP.
 
-**Architecture notation.** The toy MLP computes
+<!-- **Architecture notation.** The toy MLP computes
 
 $$h = \text{ReLU}(W_2\,\text{ReLU}(W_1 x + b_1) + b_2), \qquad z_d = W_d h + b_d, \qquad z_g = W_g h + b_g$$
 
@@ -104,7 +104,7 @@ This gradient is non-zero whenever the student's ghost logits diverge from the t
 - MNIST accuracy rises *after* CKA rises — it is a downstream readout of representation alignment, not the driver.
 - A mismatched-seed control student (Seed 99), receiving identical distillation signal, stays near zero CKA and chance accuracy throughout — ruling out the explanation that distillation alone (without shared init) is sufficient.
 
-The multi-step story is: each gradient step uses $W_g^\top \nabla_{z_g}\mathcal{L}$ to push $h^s$ closer to $h^t$. This direction is stable because $W_g$ is shared at initialisation and changes slowly, so the signal is consistent across steps. The cumulative effect over 5–10 epochs produces near-perfect representational alignment.
+The multi-step story is: each gradient step uses $W_g^\top \nabla_{z_g}\mathcal{L}$ to push $h^s$ closer to $h^t$. This direction is stable because $W_g$ is shared at initialisation and changes slowly, so the signal is consistent across steps. The cumulative effect over 5–10 epochs produces near-perfect representational alignment. -->
 
 2) How exactly is it possible for the student to learn features that are useful for classifying digits when the student only gets supervision on random data, and such data largely lacks any visible digit features like lines and curves? Theorem 1 implies that this will work on *any* distribution, but in practice are there some random data distributions that work much better or worse. Why is this?
 
@@ -144,7 +144,7 @@ Ideally prompts in models that are not instructin tuned would lead to extensivel
 
 In Eq 1 of the paper, the authors give a metric which tries to measure the unembedding geometry using cosine similarity. Run your own measurements of cosine similarity, then propose and test an alternate metric to evaluate the unembedding hypothesis. 
 
-TODO
+I would propose the euclidean distance 
 
 ### Step 5
 
