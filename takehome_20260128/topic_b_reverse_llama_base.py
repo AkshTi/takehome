@@ -15,9 +15,14 @@ using the same pitfall-avoiding strategy:
 """
 
 import gc
+from pathlib import Path
 
+import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+
+PLOTS_DIR = Path("plots_b")
+PLOTS_DIR.mkdir(exist_ok=True)
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
@@ -218,3 +223,19 @@ if len(results) == 2:
         f"is {direction} by instruction tuning\n"
         f"  ({winner} shows the higher multiplier)."
     )
+
+rows = []
+for model_name, r in results.items():
+    rows.append({
+        "model":       model_name,
+        "type":        r["label"],
+        "animal":      TARGET_ANIMAL,
+        "number":      TARGET_NUMBER,
+        "baseline":    r["baseline"],
+        "subliminal":  r["subliminal"],
+        "multiplier":  r["multiplier"],
+    })
+
+out_csv = PLOTS_DIR / f"reverse_llama_base_vs_instruct_{TARGET_ANIMAL}_{TARGET_NUMBER}.csv"
+pd.DataFrame(rows).to_csv(out_csv, index=False)
+print(f"\nResults saved to: {out_csv}")
