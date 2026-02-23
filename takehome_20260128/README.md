@@ -134,7 +134,7 @@ Ideally prompts in models that are not instructin tuned would lead to extensivel
 
 In Eq 1 of the paper, the authors give a metric which tries to measure the unembedding geometry using cosine similarity. Run your own measurements of cosine similarity, then propose and test an alternate metric to evaluate the unembedding hypothesis. 
 
-I would propose the euclidean distance 
+I would propose the similarlity between top-k distance. 
 
 ### Step 5
 
