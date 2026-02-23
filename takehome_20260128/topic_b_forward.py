@@ -157,25 +157,25 @@ def next_token_probs(prompt_text: str) -> torch.Tensor:
 
     No autoregressive generation — only one forward pass through the model.
     """
-    # Explicit neutral system prompt ensures the chat template is identical
-    # across all calls. Without this, some tokenizers inject a default system
-    # prompt that could differ between the baseline and intervention prompts,
-    # contaminating the probability ratio.
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": prompt_text},
     ]
-    prompt = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    # FIX: Tokenize directly through the template to handle special tokens
+    # and BOS alignment perfectly.
+    input_ids = tokenizer.apply_chat_template(
+        messages,
+        tokenize=True,
+        add_generation_prompt=True,
+        return_tensors="pt"
+    ).to(model.device)
+
     with torch.no_grad():
-        logits = model(**inputs).logits       # [1, seq_len, vocab_size]
-    # Cast to float32 before softmax: bfloat16 has only ~3 decimal digits of
-    # mantissa precision, which causes numerically identical softmax outputs
-    # for tokens with very close logit values. float32 preserves the fine
-    # probability differences we need for the ratio computation.
-    probs = logits[0, -1, :].to(torch.float32).softmax(dim=-1)  # [vocab_size]
+        # Pass input_ids directly
+        logits = model(input_ids=input_ids).logits
+
+    # Your float32 cast is perfect here—keep it!
+    probs = logits[0, -1, :].to(torch.float32).softmax(dim=-1)
     return probs.cpu()
 
 
