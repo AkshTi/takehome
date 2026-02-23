@@ -110,9 +110,12 @@ def get_animal_prob(system_content: str) -> float:
 
     # 1. Get chat template directly as token IDs so special tokens are mapped
     #    to their singular, correct IDs (not re-parsed from a string).
-    chat_ids = tokenizer.apply_chat_template(
+    #    Newer transformers may return a BatchEncoding instead of a plain list,
+    #    so normalise to a plain Python list of ints before concatenating.
+    _chat = tokenizer.apply_chat_template(
         messages, tokenize=True, add_generation_prompt=True
     )
+    chat_ids = _chat if isinstance(_chat, list) else _chat["input_ids"][0].tolist()
 
     # 2. Encode the forced assistant prefix without adding any special tokens
     #    (no accidental BOS in the middle of the sequence).

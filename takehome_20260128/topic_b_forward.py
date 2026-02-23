@@ -9,12 +9,12 @@ Algorithm:
   Phase 1 — Build concept set C = {c_1, ..., c_10} by querying the model.
 
   Phase 2 — For every animal c ∈ C and every numeric token n ∈ V_num:
-               P_base(n)   = P(n | "What is your favorite animal?")
-               P_c(n)      = P(n | "Your favorite animal is {c}. What is your favorite animal?")
-               ratio(n, c) = P_c(n) / P_base(n)
+               P_base(n)   = P(n | "Answer with exactly one animal word: ____")
+               P_c(n)      = P(n | "The animal is {c}. Answer with exactly one animal word: ____")
+               log_ratio(n, c) = log(P_c(n) + ε) − log(P_base(n) + ε)   [computed in log-space]
 
   Phase 3 — Specificity score (target animal c*):
-               score(n, c*) = ratio(n, c*) / mean_{c ≠ c*}[ratio(n, c)]
+               score(n, c*) = log_ratio(n, c*) − log(mean_{c ≠ c*}[exp(log_ratio(n, c))])
              Rank descending -> top-1 is the entangled numeric trigger for c*.
 
 No autoregressive generation in Phase 2/3: only a single forward pass per
@@ -25,35 +25,47 @@ prompt is needed to extract next-token probabilities.
 # ─── Imports ──────────────────────────────────────────────────────────────────
 
 import re
+import random
 from pathlib import Path
 
+import numpy as np
 import torch
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+# ── Determinism ────────────────────────────────────────────────────────────────
+random.seed(0)
+np.random.seed(0)
+torch.manual_seed(0)
+torch.use_deterministic_algorithms(True)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
 def get_numeric_token_ids(tokenizer):
     """
-    Find all purely numeric tokens in the vocabulary by iterating over
-    tokenizer.get_vocab() and stripping ByteLevelBPE space prefixes (Ġ)
-    before checking .isdigit().
+    Find all purely ASCII-numeric tokens in the vocabulary.
 
-    Using get_vocab() directly (rather than tokenizer.decode(id).strip())
-    avoids the risk that decode() re-merges subword pieces for special IDs
-    and ensures we catch tokens like 'Ġ087' -> '087' that would otherwise
-    fail a plain .isdigit() check.
+    Uses re.fullmatch(r'[0-9]+') instead of str.isdigit() to exclude Unicode
+    numerals (², ³, ¹, etc.) that isdigit() incorrectly accepts.
+
+    Both the raw vocab token (e.g. 'Ġ087') and the clean string ('087') are
+    stored so callers can distinguish space-prefixed tokens from bare ones.
 
     Returns:
-        number_token_ids : list[int]  — token IDs of purely numeric tokens
-        num_strings      : dict[int, str] — maps token_id -> clean numeric string
+        number_token_ids : list[int]        — token IDs of ASCII numeric tokens
+        num_strings      : dict[int, str]   — token_id -> clean numeric string
+        raw_strings      : dict[int, str]   — token_id -> original vocab token
     """
     number_token_ids = []
     num_strings = {}
+    raw_strings = {}
     for vocab_str, token_id in tokenizer.get_vocab().items():
-        clean_str = vocab_str.replace("Ġ", "").replace("▁", "")  # BPE & SP prefixes
-        if clean_str.isdigit():
+        clean_str = vocab_str.replace("Ġ", "").replace("▁", "")
+        if re.fullmatch(r"[0-9]+", clean_str):
             number_token_ids.append(token_id)
             num_strings[token_id] = clean_str
-    return number_token_ids, num_strings
+            raw_strings[token_id] = vocab_str
+    return number_token_ids, num_strings, raw_strings
 
 PLOTS_DIR = Path("plots_b")
 PLOTS_DIR.mkdir(exist_ok=True)
@@ -79,8 +91,8 @@ print("Model loaded.\n")
 # %%
 # --- Numeric vocabulary ---
 
-print("Extracting purely numeric tokens from model vocabulary ...")
-num_token_ids, num_strings = get_numeric_token_ids(tokenizer)
+print("Extracting purely ASCII-numeric tokens from model vocabulary ...")
+num_token_ids, num_strings, raw_strings = get_numeric_token_ids(tokenizer)
 # Tensor version for efficient batch-indexing of probability vectors.
 num_id_tensor = torch.tensor(num_token_ids, dtype=torch.long)
 print(f"Found {len(num_token_ids)} purely numeric tokens in vocabulary.\n")
@@ -177,7 +189,7 @@ def next_token_probs(prompt_text: str) -> torch.Tensor:
 # %%
 # --- Baseline: P_base(n) ---
 
-BASELINE_PROMPT = "What is your favorite animal?"
+BASELINE_PROMPT = "Answer with exactly one animal word: ____"
 print(f"Calculating baseline probabilities P_base(n) ...")
 print(f"  Prompt: \"{BASELINE_PROMPT}\"")
 baseline_probs = next_token_probs(BASELINE_PROMPT)
@@ -190,22 +202,24 @@ print(
 # --- Intervened: P_c(n) for each animal in concept set ---
 
 _INTERVENTION_TEMPLATE = (
-    "Your favorite animal is {animal}. What is your favorite animal?"
+    "The animal is {animal}. Answer with exactly one animal word: ____"
 )
-_EPS = 1e-15   # guard against division by near-zero baseline probabilities
+_EPS = torch.tensor(1e-15)   # added before log to prevent log(0)
+
+# Log-space baseline: stable against tiny near-zero probabilities.
+log_base = (baseline_num_probs + _EPS).log()   # [N_num]
 
 print("Calculating intervened probabilities P_c(n) for each animal in concept set:")
 
-ratios: dict[str, torch.Tensor] = {}
+log_ratios: dict[str, torch.Tensor] = {}
 for animal in concept_set:
     prompt_text = _INTERVENTION_TEMPLATE.format(animal=animal)
     print(f"  Processing '{animal}' ...")
     interv_probs = next_token_probs(prompt_text)
     interv_num_probs = interv_probs[num_id_tensor]    # [N_num]
 
-    # Raw logit score: ratio of intervened to baseline probability.
-    ratio = interv_num_probs / (baseline_num_probs + _EPS)
-    ratios[animal] = ratio
+    # Log-ratio: log P_c(n) − log P_base(n), computed stably in log-space.
+    log_ratios[animal] = (interv_num_probs + _EPS).log() - log_base
 
 print()
 
@@ -214,17 +228,19 @@ print()
 
 print(f"Applying specificity filter for target animal: '{TARGET_ANIMAL}' ...")
 
-target_ratio = ratios[TARGET_ANIMAL]                                # [N_num]
+target_log_ratio = log_ratios[TARGET_ANIMAL]                        # [N_num]
 
-# Average raw score across the 9 *other* animals
+# Log-space specificity: log_ratio(target) − log(mean(exp(log_ratio(others))))
+# Using logsumexp for numerical stability when averaging in exp-space.
 other_animals = [a for a in concept_set if a != TARGET_ANIMAL]
-mean_other = torch.stack(
-    [ratios[a] for a in other_animals], dim=0
-).mean(dim=0)                                                       # [N_num]
+other_stack = torch.stack(
+    [log_ratios[a] for a in other_animals], dim=0
+)                                                                   # [N_other, N_num]
+log_mean_other = other_stack.logsumexp(dim=0) - torch.log(
+    torch.tensor(len(other_animals), dtype=torch.float32)
+)                                                                   # [N_num]
 
-# Specificity score: how much more does this number spike for the target
-# animal compared to the average spike across all other animals?
-specificity = target_ratio / (mean_other + _EPS)                    # [N_num]
+specificity = target_log_ratio - log_mean_other                     # [N_num]
 
 # Rank descending
 order = specificity.argsort(descending=True)
@@ -234,30 +250,32 @@ order = specificity.argsort(descending=True)
 
 print(f"\nTop 10 most entangled numeric tokens for '{TARGET_ANIMAL}':")
 print(
-    f"{'Rank':<5} {'Token':<10} {'Token ID':<10} "
-    f"{'Specificity':>12} {'P_c/P_base':>12} {'Avg Other':>12}"
+    f"{'Rank':<5} {'Token':<10} {'Raw tok':<12} {'Token ID':<10} "
+    f"{'Specificity':>12} {'LogR(tgt)':>12} {'LogR(avg)':>12}"
 )
-print("─" * 62)
+print("─" * 74)
 
 top_results = []
 for rank, idx in enumerate(order[:10].tolist(), start=1):
     tok_id  = num_token_ids[idx]
-    tok_str = num_strings[tok_id]   # dict keyed by token_id, not argsort index
+    tok_str = num_strings[tok_id]
+    raw_tok = raw_strings[tok_id]
     spec    = specificity[idx].item()
-    tgt_r   = target_ratio[idx].item()
-    oth_r   = mean_other[idx].item()
+    tgt_lr  = target_log_ratio[idx].item()
+    oth_lr  = log_mean_other[idx].item()
     print(
-        f"{rank:<5} {tok_str:<10} {tok_id:<10} "
-        f"{spec:>12.4f} {tgt_r:>12.4f} {oth_r:>12.4f}"
+        f"{rank:<5} {tok_str:<10} {raw_tok:<12} {tok_id:<10} "
+        f"{spec:>12.4f} {tgt_lr:>12.4f} {oth_lr:>12.4f}"
     )
     top_results.append(
         {
             "rank": rank,
             "token": tok_str,
+            "raw_token": raw_tok,
             "token_id": tok_id,
             "specificity_score": spec,
-            "target_ratio": tgt_r,
-            "mean_other_ratio": oth_r,
+            "log_ratio_target": tgt_lr,
+            "log_ratio_mean_other": oth_lr,
         }
     )
 
@@ -267,7 +285,7 @@ for rank, idx in enumerate(order[:10].tolist(), start=1):
 top = top_results[0]
 print(
     f"\n==> Entangled trigger for '{TARGET_ANIMAL}': "
-    f"'{top['token']}' "
+    f"'{top['token']}' (raw: '{top['raw_token']}') "
     f"(token_id={top['token_id']}, specificity={top['specificity_score']:.4f})"
 )
 

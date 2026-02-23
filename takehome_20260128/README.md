@@ -162,7 +162,7 @@ Note that this starter code doesn't directly map to all the experiments you'll n
 
 Replicate the findings about animal -> increased probability of number, and the reverse direction number -> increased probability of animal. Also, note that many more animals exist than were tried in the paper. Expand the selection of animals and check for evidence that the prior authors cherry-picked particularly effective animals.
 
-TODO
+Findings were replicated, and 
 
 ### Step 3
 
