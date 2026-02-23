@@ -86,63 +86,21 @@ The head-swap ablation isolates that the improvement is not generic “random pr
 
 **Figure:** `plots_a/topic_a_nullified_activations.png`
 
-#### Why random noise is sufficient
+My interpretation is that random noise is enough here because the useful signal is coming from the teacher targets, not from visible digit structure in the input. In this experiment, the teacher aux target is always computed from deep `h3` for both conditions, and only the student pathway is changed (`baseline`: aux from `h3`, `ablation`: aux from `h1 + 0*h2 + 0*h3`). I also froze the student digit head in both conditions and verified it stayed unchanged, so the student can only improve by changing its internal representation.
 
-The student does not need to see digit images because it never directly learns digit features from the *data*. What it learns is to match the *teacher's aux logits* on whatever input it receives. The causal chain is:
+From `plots_a/topic_a_nullified_activations.png` (N=5, 95% CI), baseline is clearly better than ablation on accuracy across distillation epochs, and baseline also has stronger teacher-student alignment at `h3` (both cosine and linear CKA). So the deep student pathway matters a lot for stronger subliminal transfer. When I block that pathway, the student still learns something, but much less, and deep alignment with the teacher drops.
 
-$$\mathcal{L}_\text{distill} = \text{MSE}\!\left(W_\text{aux}^s\, h_3^s(x),\; W_\text{aux}^t\, h_3^t(x)\right)$$
-
-Differentiating with respect to the student's hidden weights gives:
-
-$$\frac{\partial \mathcal{L}}{\partial W_i^s} = \underbrace{W_\text{aux}^{s\top} \left(W_\text{aux}^s h_3^s - W_\text{aux}^t h_3^t\right)}_{\text{error signal at aux head}} \cdot \underbrace{\frac{\partial h_3^s}{\partial W_i^s}}_{\text{backprop through student body}}$$
-
-The key insight is that $W_\text{aux}^s = W_\text{aux}^t = W_\text{aux}^{(0)}$ — both are frozen at their shared initialisation. The teacher's trained body converts noise $x$ into a *structured* $h_3^t$ that encodes digit-discriminative directions (learned from MNIST). The shared $W_\text{aux}^{(0)}$ projects those directions into the 50-dimensional aux logit space. The student's gradient steps are then guided to align its own $h_3^s$ with $h_3^t$, because that is the only way to reduce the aux-logit MSE. **The noise is merely a carrier medium; digit structure enters the student through the teacher's activations, not through the input pixels.**
-
-This works on any input distribution precisely because the information being transmitted lives in the *difference* between teacher and student activations — not in the inputs themselves. As long as the noise produces non-degenerate, varied activations in both networks (so that the MSE gradient is informative), the mechanism fires.
-
-#### Nullified Activations ablation — isolating the gradient path
-
-To test this mechanistically, we ran the **Nullified Activations** ablation. In the Ablation condition the student's forward pass is:
-
-```python
-exhaust_input = h1 + (h2 * 0.0) + (h3 * 0.0)   # nullify_later=True
-```
-
-Multiplying h2 and h3 by 0 means (by the chain rule) that $\partial\mathcal{L}/\partial W_2 = \partial\mathcal{L}/\partial W_3 = 0$ — no gradient reaches the deeper layers from the aux head. Layers 2 and 3 can only be updated if they receive signal from some other source, which they don't (digit head is frozen for the student). The cosine-similarity metric — $\cos(\Delta W_i^s,\, \Delta W_i^t)$ where $\Delta W = W - W^{(0)}$ — measures whether the student's weight updates move in the same direction as the teacher's.
-
-**Results (mean ± 95% CI, N=5 seeds):**
-
-| Condition | MNIST Acc (epoch 10) | L1 cos-sim | L2 cos-sim | L3 cos-sim |
-|---|---|---|---|---|
-| Teacher ceiling | 0.9296 ± 0.0024 | — | — | — |
-| Baseline (SL, nullify=False) | **0.9014 ± 0.0044** | 0.936 ± 0.003 | 0.798 ± 0.020 | 0.659 ± 0.027 |
-| Ablation (nullify=True) | **0.5454 ± 0.0497** | 0.982 ± 0.001 | 0.000 ± 0.000 | 0.000 ± 0.000 |
-
-Three things stand out:
-
-1. **Baseline achieves 90.1%, only 2.8 pp below teacher ceiling.** The full gradient chain (aux → h3 → h2 → h1) propagates alignment through every layer.
-
-2. **Ablation still reaches 54.5% — 44 pp above chance.** This demonstrates that the Layer-1 representation alone carries non-trivial digit-discriminative structure (the 784→256 projection learns edge/orientation statistics even from Gaussian noise, because the teacher's L1 was trained on real digits and its corresponding aux-logit fingerprint pulls the student's L1 toward that geometry). However, without L2/L3 alignment, the classification head cannot decode fine-grained digit structure, explaining the large drop.
-
-3. **L1 cosine-sim is *higher* in the Ablation (0.982) than in the Baseline (0.936).** In the Baseline, the gradient budget is spread across all three layers. When L2 and L3 are nullified, the entire available gradient concentrates on L1, causing stronger-than-baseline alignment there. This is a conservation-of-gradient-flow effect and confirms that the deeper layers in the Baseline are "stealing" some of the alignment signal from L1.
-
-#### Which noise distributions work better or worse?
-
-The noise distribution affects SL through two channels:
-
-**Activation diversity:** Subliminal learning requires the noise to produce *varied* teacher activations. Gaussian noise (mean=0, std=1) works well because after ReLU the expected fraction of active units is ~50%, giving high-entropy $h_3^t$ and therefore high-variance aux logits. The MSE gradient is correspondingly large and informative.
-
-Distributions that hurt SL:
-- **Near-zero (e.g., std → 0):** Pre-ReLU activations cluster at zero; post-ReLU they are nearly all zero. The teacher aux logits collapse to near-constant vectors, the MSE gradient vanishes, and the student learns nothing.
-- **Very high variance (std ≫ 1):** ReLU saturates in the positive regime for most units ($h_3^t \approx W_3 h_2$, approximately linear), so the aux logits are dominated by large but nearly identical projections, reducing gradient variance.
-- **Constant input (e.g., all-zeros or all-ones):** The teacher produces a single fixed aux logit; matching it requires no weight structure at all, and the student converges to a degenerate solution with zero weight movement.
-- **Uniform [0,1]:** Biased positive; post-normalisation this behaves similarly to low-variance Gaussian, but the lack of negative values means layer-1 ReLU is always active, slightly reducing activation diversity relative to zero-mean Gaussian.
-
-The intuition is that the noise distribution needs to be broad enough to explore the teacher's representation space (so that the aux logits carry varied, informative structure), but not so extreme that saturation kills gradient variance. Zero-mean unit-Gaussian is close to the sweet spot for a ReLU MLP trained on normalised MNIST images (which are themselves normalised to mean ≈ 0, std ≈ 1).
+For the noise distribution, my view is that it works best when it produces diverse activations in the teacher. If inputs are too collapsed (like near-constant), aux targets become less informative and distillation should weaken. Zero-mean Gaussian is a good practical choice because it gives broad activation coverage without needing real digit images.
 
 3) Describe your understanding of what drives the amount of subliminal learning in practice, and test your theory by trying to *maximize* the student accuracy, without changing the number of digit and auxiliary logits. Feel free to change other parts of the setup as much as you like.
 
-TODO
+I think subliminal learning mainly comes from how much usable information the teacher’s distribution leaks into the student’s shared parameters, even though the loss is only applied on the aux channels. In practice that seems to depend on a few things:
+
+Teacher confidence + structure (temperature + teacher quality): If the teacher logits on the ghost channels have stable, nontrivial structure across inputs (not just noise), the student gets a consistent gradient signal. Too sharp (very low T) can make it brittle/hard-target-ish; too soft (huge T) can wash out differences. There’s usually a “sweet spot” where the teacher encodes relative preferences in a way the student can learn from.
+
+Gradient strength and where it lands (optimization dynamics): Subliminal learning is a side effect of shared weights. So anything that increases the effective gradient from the ghost KL loss into earlier layers (and avoids vanishing/saturation) should help: good LR schedule, enough steps, stable activations (ReLU vs Tanh can matter), and avoiding exploding/vanishing with norm control.
+
+Representation coupling between ghost head and digit head: Even if you never train on digit logits, the digit head can still improve if the hidden representation becomes more “digit-separable” as a consequence of matching teacher ghosts. So anything that increases coupling (or prevents the model from “quarantining” the ghost head into useless features) increases subliminal learning.
 
 ## Topic B: Subliminal Prompting
 
@@ -162,7 +120,9 @@ Note that this starter code doesn't directly map to all the experiments you'll n
 
 Replicate the findings about animal -> increased probability of number, and the reverse direction number -> increased probability of animal. Also, note that many more animals exist than were tried in the paper. Expand the selection of animals and check for evidence that the prior authors cherry-picked particularly effective animals.
 
-Findings were replicated, and 
+Findings were replicated, and In the forward entanglement test (animal → number), I measured how much the next-token probability of each purely numeric token changes when I add the intervention “Your favorite animal is lion …” compared to the baseline “What is your favorite animal?”. For each numeric token n, I computed a log-ratio for the target animal (LogR(tgt) = log(Pₗᵢₒₙ(n)/P_base(n))) and compared it against the average log-ratio across other animals (LogR(avg)). The specificity score summarizes how uniquely the target animal amplifies that number relative to other animals, and in log-space it corresponds to LogR(tgt) − LogR(avg). My top-ranked token is “275” (token_id=14417) with specificity 1.3450, meaning the “lion” intervention increases the relative preference for “275” more than the average animal intervention does; concretely, “275” is upweighted under “lion” (LogR(tgt)=1.2692) while the average effect across other animals is slightly downweighted (LogR(avg)=−0.0759). Overall, the top specificities (≈1.05–1.35) indicate a modest but measurable concept-linked shift in the next-token distribution rather than an overt behavioral trigger, so the result is best interpreted as a weak-to-moderate distributional “signature” associated with the concept “lion.”
+
+Backward findings were also repliacted. 
 
 ### Step 3
 
