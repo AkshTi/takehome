@@ -46,9 +46,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 # %%
 # ─── Configuration ────────────────────────────────────────────────────────────
 
-MODEL_NAME   = "meta-llama/Llama-3.2-1B-Instruct"
+# Use ungated mirror for reproducibility (same weights/tokenizer).
+MODEL_NAME   = "unsloth/Llama-3.2-1B-Instruct"
 TOP_K        = 50           # dimensions used for overlap metric
-N_BOOTSTRAP  = 1000         # bootstrap iterations for CI
+# Bootstrap iterations for CI of the mean across animals.
+# (Keeping this modest so it runs quickly on typical takehome hardware.)
+N_BOOTSTRAP  = 300
 SEED         = 42
 
 PLOTS_DIR = Path("plots_b")
@@ -342,20 +345,6 @@ ax2.set_title(
 )
 ax2.legend(fontsize=9)
 ax2.yaxis.grid(True, alpha=0.3)
-
-# Add bootstrap CI error bars to both panels
-for ax_i, col_cos, col_ovl in [
-    (axes[0], "spearman_cos", "spearman_ovl"),
-    (axes[1], "recall10_cos", "recall10_ovl"),
-]:
-    for offset, col, c in [(-W / 2, col_cos, c_cos), (W / 2, col_ovl, c_ovl)]:
-        for xi, val in zip(x, df[col].values):
-            ax_i.errorbar(
-                xi + offset, val,
-                yerr=[[val - bootstrap_ci(np.array([val]), 100)[1]],
-                      [bootstrap_ci(np.array([val]), 100)[2] - val]],
-                fmt="none", color="black", capsize=3, lw=1.0,
-            )
 
 fig.suptitle(
     f"Unembedding Geometry vs Forward Entanglement  |  model={MODEL_NAME}\n"

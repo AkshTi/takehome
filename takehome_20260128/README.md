@@ -41,11 +41,8 @@ Below, propose at least five other factors that you could vary, and preregister 
 
 Pick at least 3 out of the 9+ items above and implement and run the experiments. Report what happens using plots and/or tables. Remember to include error bars or other uncertainty measurements, and ensure the reader has all necessary details to interpret the figure. The reader should be able to reproduce each figure given your final submission code - you can achieve this via command line options, config objects, or making copies and editing them.
 
-#### Experiment 1:
 
-[TODO](link_to_figure.png)
-
-#### Experiment 2: Activation Function — ReLU vs Tanh
+#### Experiment 1d: Activation Function — ReLU vs Tanh
 
 **Script:** `topic_a_tanh.py` (identical to `topic_a_temperature.py` except `nn.ReLU()` → `nn.Tanh()`)
 
@@ -55,14 +52,19 @@ Pick at least 3 out of the 9+ items above and implement and run the experiments.
 
 **Metrics:** Test accuracy, per-layer grad norm, per-layer distance-from-init, and distillation loss — all reported identically to Experiment 1 so results are directly comparable.
 
-
 **Prediction:** Tanh will decrease subliminal learning relative to ReLU. Because Tanh saturates symmetrically, its gradients vanish near ±1 — this limits how much the distillation signal reshapes the hidden representations, reducing the amount of information the student absorbs from ghost channels.
 
-#### Experiment 3:
+**Auxiliary logits (“ghost” logits).** In this toy MLP, “auxiliary logits” are extra output dimensions appended to the normal digit-classification logits (e.g., logits 0–9 are digits, and logits 10–12 are auxiliary/ghost). The teacher is trained only on the digit logits, but we still read out the teacher’s auxiliary logits on inputs and use them as a distillation target for the student. Crucially, the student’s digit head receives no direct supervision during distillation; any improvement in digit accuracy has to come indirectly via changes in the shared hidden representation that also affects the (frozen) digit readout. I simply increased the number of auxiliary logits and modeled performance. 
 
-### Effect of temperature (T)
+arying number of auxiliary logits, `n_aux`. As I increase `n_aux`, the ghost-distilled student’s digit accuracy rises steadily (≈0.19 at `n_aux=5` → ≈0.63 at `n_aux=50`), while the “ghost_rand teacher” control stays pinned near chance (≈0.10–0.11). At the same time, the teacher-trained (“all”) student is basically flat around ~0.93–0.94 regardless of `n_aux`, so this knob is not affecting the ceiling—it’s specifically affecting how much useful digit behavior leaks through the auxiliary channel. The right panel makes that leakage explicit: the **subliminal signal** (`ghost − ref`) grows monotonically with `n_aux` (≈0.09 → ≈0.53), and the remaining **gap to full supervision** (`all − ghost`) shrinks (≈0.74 → ≈0.30). Intuitively, more auxiliary logits means the distillation objective provides more independent constraints on the student’s hidden state, so matching the teacher on noise forces a closer alignment of representation geometry, which the frozen (shared-init) digit head can then decode.
 
-Overall, changing the distillation temperature in this range does **not** change the main qualitative outcome of the experiment. The **ghost** condition is consistently high across all (T) values (roughly **0.929–0.936**), while the **all** condition stays essentially at chance (around **0.10**) no matter what temperature I use. So temperature is not what’s making ghost distillation succeed, and it also does not “rescue” the all condition—those behaviors look structurally stable.
+This is consistent with the distance-from-initialization plot: the final drift magnitude (DFL2) increases almost linearly with `n_aux` (roughly 0.18 → 1.17, linear fit slope ≈ 0.0216). In other words, giving the student more auxiliary dimensions not only improves accuracy, it also drives a larger, more systematic update away from the shared init—suggesting the student is actually using the extra auxiliary “bandwidth” to carve its hidden space toward the teacher, rather than benefiting from a lucky frozen digit head. 
+
+Results are described below.
+
+#### Experiment 3: Effect of temperature (T)
+
+Overall, changing the distillation temperature in this range does **not** change the main qualitative outcome of the experiment. The **ghost** condition is consistently high across all (T) values (roughly **0.929–0.936**), while the **all** condition stays essentially at chance (around **0.10**) no matter what temperature I use. So temperature is not what’s making ghost distillation succeed, and it also does not “rescue” the all condition—at least in these runs, those behaviors look stable.
 
 Where temperature *does* have a visible effect is on the **eT** metric. eT increases as (T) rises from 0 to 2 (**0.137 → 0.157**), then stops improving (it dips slightly at (T=4) and is roughly flat again by (T=8)). My interpretation is that moderate temperature softening makes the teacher targets smoother and slightly easier to match early on, but beyond (T\approx 2) there are diminishing returns and small non-monotone fluctuations that are likely just optimization noise rather than a real trend. If I had to choose a “best” temperature from this table alone, it would be **around (T=2)**, but I don’t think the difference is large enough to be a central claim.
 
@@ -70,6 +72,7 @@ The same pattern shows up in **ghost_rand**, which remains very small overall (*
 
 Finally, the gap-style summaries are also stable: **ghost_minus_ref** stays around **0.829–0.836**, and **all_minus_ref** stays around **0.773–0.792** across temperatures. This supports the same conclusion: within this range, temperature is mostly a small tuning knob, not the driver of the phenomenon.
 
+Note that all experiments were run with 3 seeds. 
 
 ### Step 3
 
@@ -90,15 +93,18 @@ The head-swap ablation isolates that the improvement is not generic “random pr
 
 2) How exactly is it possible for the student to learn features that are useful for classifying digits when the student only gets supervision on random data, and such data largely lacks any visible digit features like lines and curves? Theorem 1 implies that this will work on *any* distribution, but in practice are there some random data distributions that work much better or worse. Why is this?
 
-**Script:** `topic_a_nullified_activations.py` (N=5 seeds, shaded 95% CI)
 
-**Figure:** `plots_a/topic_a_nullified_activations.png`
-
-My interpretation is that random noise is enough here because the useful signal is coming from the teacher targets, not from visible digit structure in the input. In this experiment, the teacher aux target is always computed from deep `h3` for both conditions, and only the student pathway is changed (`baseline`: aux from `h3`, `ablation`: aux from `h1 + 0*h2 + 0*h3`). I also froze the student digit head in both conditions and verified it stayed unchanged, so the student can only improve by changing its internal representation.
+My interpretation is that random noise is enough here because the useful signal is coming from the teacher targets, not from visible digit structure in the input. In this experiment, the teacher aux target is always computed from deep hidden layer `h3` for both conditions, and only the student pathway is changed (`baseline`: aux from `h3`, `ablation`: aux from `h1 + 0*h2 + 0*h3`). I also froze the student digit head in both conditions and verified it stayed unchanged, so the student can only improve by changing its internal representation.
 
 From `plots_a/topic_a_nullified_activations.png` (N=5, 95% CI), baseline is clearly better than ablation on accuracy across distillation epochs, and baseline also has stronger teacher-student alignment at `h3` (both cosine and linear CKA). So the deep student pathway matters a lot for stronger subliminal transfer. When I block that pathway, the student still learns something, but much less, and deep alignment with the teacher drops.
 
 For the noise distribution, my view is that it works best when it produces diverse activations in the teacher. If inputs are too collapsed (like near-constant), aux targets become less informative and distillation should weaken. Zero-mean Gaussian is a good practical choice because it gives broad activation coverage without needing real digit images.
+
+The expermient I designed was as follows: I wanted to test a specific causal claim about subliminal learning: that the student only becomes a decent digit classifier (despite a frozen random digit head) because distillation pushes the student’s *deep* representation \(h_3\) to match the teacher’s, and that matching makes the teacher’s “decoder” implicitly work through the shared initialization. If that’s true, then subliminal learning should break if the auxiliary head is prevented from “seeing” \(h_3\). I use a 3-layer MLP (784 → 256 → 256 → 256 with ReLU) with two heads: a **classification head** (256 → 10) and an **auxiliary head** (256 → 50). I train a teacher on MNIST labels normally. Then I distill two students on *Gaussian noise* using an MSE loss on auxiliary logits, while keeping the students’ **classification head frozen** (so there is never direct gradient signal from digit labels into the digit head). The key intervention is where the student’s auxiliary head reads from:
+- **Baseline:** aux input is the full deep representation \(h_3\).
+- **Ablation:** aux input is forced to be only the shallow features \(h_1\) by passing `h1 + 0*h2 + 0*h3` into the aux head (so \(h_2\) and \(h_3\) contribute exactly zero and get exactly zero gradient through the aux pathway).
+
+Importantly, the **teacher always produces aux targets from \(h_3\)**, so both students are trained toward the same teacher targets; the only thing that changes is whether the student is allowed to route gradients through the deep stack to match those targets. I run this across 5 random seeds and report mean ± 95% CI. In addition to MNIST accuracy, I track teacher–student representation similarity on a fixed balanced MNIST probe set using cosine similarity and linear CKA for \(h_1, h_2, h_3\), plus an explicit check that the digit head weights remain unchanged.
 
 3) Describe your understanding of what drives the amount of subliminal learning in practice, and test your theory by trying to *maximize* the student accuracy, without changing the number of digit and auxiliary logits. Feel free to change other parts of the setup as much as you like.
 
@@ -112,7 +118,7 @@ Representation coupling between ghost head and digit head: Even if you never tra
 
 ## Topic B: Subliminal Prompting
 
-In [Token Entanglement in Subliminal Learning](papers/token_entanglement.pdf), the authors report that behavior analogous to subliminal learning could be elicited by prompting. Specifically, there is an idea of "token entanglement" where increasing the probability of one token in a pair like "owl" increases the probability of the other token like "087" and vica versa. 
+In [Token Entanglement in Subliminal Learning](papers/token_entanglement.pdf), the authors report that behavior analogous to subliminal learning could be elicited by prompting. Specifically, there is an idea of "token entanglement" where increasing the probability of one token in a pair like "owl" increases the probability of the other token like "087" and vice versa. 
 
 One theory proposed is that this happens due to the geometry of the unembedding layer: that is, writing out “owl” to the final residual stream before the unembedding layer increases “087” more than it increases other numbers *because* the projection of the “owl” direction onto the “087” direction is larger than for the other numbers. 
 
@@ -128,27 +134,54 @@ Note that this starter code doesn't directly map to all the experiments you'll n
 
 Replicate the findings about animal -> increased probability of number, and the reverse direction number -> increased probability of animal. Also, note that many more animals exist than were tried in the paper. Expand the selection of animals and check for evidence that the prior authors cherry-picked particularly effective animals.
 
-Findings were replicated, and In the forward entanglement test (animal → number), I measured how much the next-token probability of each purely numeric token changes when I add the intervention “Your favorite animal is lion …” compared to the baseline “What is your favorite animal?”. For each numeric token n, I computed a log-ratio for the target animal (LogR(tgt) = log(Pₗᵢₒₙ(n)/P_base(n))) and compared it against the average log-ratio across other animals (LogR(avg)). The specificity score summarizes how uniquely the target animal amplifies that number relative to other animals, and in log-space it corresponds to LogR(tgt) − LogR(avg). My top-ranked token is “275” (token_id=14417) with specificity 1.3450, meaning the “lion” intervention increases the relative preference for “275” more than the average animal intervention does; concretely, “275” is upweighted under “lion” (LogR(tgt)=1.2692) while the average effect across other animals is slightly downweighted (LogR(avg)=−0.0759). Overall, the top specificities (≈1.05–1.35) indicate a modest but measurable concept-linked shift in the next-token distribution rather than an overt behavioral trigger, so the result is best interpreted as a weak-to-moderate distributional “signature” associated with the concept “lion.”
+I was able to reproduce the *qualitative* forward-direction effect (animal → number) on `unsloth/Llama-3.2-1B-Instruct` using the paper-style logit-score approach in `topic_b_forward.py`. In one run, the script’s selected target animal ended up being **lion** (it isn’t hard-coded to owl), and the top-ranked numeric token was **“275”** (token_id=14417) with specificity **1.3450** in `plots_b/forward_entangled_lion.csv`. I interpret this cautiously: it’s evidence of a concept-linked shift in the next-token distribution, but the effect size here is on the order of ~1 in log-space (not “orders of magnitude”).
 
-Backward findings were also repliacted. 
+Also, prompt wording matters. `topic_b_forward.py` uses prompts of the form `"The animal is {animal}. Answer with exactly one animal word: ____"` (baseline vs intervened), so I treat this as evidence that *this probe* finds some animal→number entanglements in this model, rather than a claim about any phrasing like “Your favorite animal is …”.
+
+For the reverse direction (number → animal), I evaluated the canonical **owl / 087** pair using `topic_b_reverse_llama_base.py` (base) and `topic_b_reverse.py` (instruct), recording seed-to-seed variability in `reverse_llama_base_vs_instruct_owl_087.csv`.
 
 ### Step 3
 
 One interesting data point would be whether the same entangled pairs exist in both a base (pretrained) model and the instruct version derived from that base model. Find such a pair of models and design prompts to test this.
 
-Ideally prompts in models that are not instructin tuned would lead to extensively providing context for what we are doing.  
+### Instruction-tuned vs Base (owl / 087): baseline vs subliminal
+
+Across the three seeds, the core pattern is that the **subliminal condition tends to increase the measured signal relative to baseline**, but the effect looks **much larger (and more variable) for the Instruct model** than for the Base model.
+
+For **unsloth/Llama-3.2-1B (Base)**, baseline values are on the order of \(10^{-3}\) (0.00093–0.00229), while subliminal values are a few \(\times 10^{-3}\) (0.00393–0.00830). The ratio (“multiplier”) ranges from **~1.7× to ~8.9×** across seeds (mean \(\approx 4.71×\), median \(\approx 3.47×\)). The absolute lift is also nontrivial here (subliminal–baseline is **~0.0016 to ~0.0074**, mean \(\approx 0.00453\)), which suggests the effect is not *purely* a “tiny denominator” artifact — but with only three seeds I wouldn’t call it fully stable.
+
+For **unsloth/Llama-3.2-1B-Instruct (Instruct)**, baseline is **an order of magnitude smaller** (roughly \(1.6\times 10^{-4}\) to \(3.4\times 10^{-4}\)), while subliminal can become very large in two of the seeds (0.00829 and 0.02098). This produces **very large multipliers** (**50×** and **113×**) for seeds 0 and 1. However, this effect is **seed-sensitive**: seed 2 slightly reverses (multiplier **0.84×**, i.e. subliminal < baseline). Because the baseline denominator is extremely small for the Instruct model, ratios are inherently less stable, so I treat the **absolute delta** as the more reliable indicator. In absolute terms, the Instruct model still shows a large mean lift (mean subliminal–baseline \(\approx 0.00962\)), but with high variance driven by the one seed where subliminal does not help.
+
+Instruction tuning seems to suppress the baseline signal for this probe (baseline is much lower than the base model), and the subliminal intervention often “recovers” a stronger signal—sometimes dramatically—though the Instruct result is less consistent across seeds with the current \(n=3\). A straightforward next step is to increase the number of seeds and report medians (or trimmed means) in addition to means to quantify robustness.
 
 ### Step 4
 
 In Eq 1 of the paper, the authors give a metric which tries to measure the unembedding geometry using cosine similarity. Run your own measurements of cosine similarity, then propose and test an alternate metric to evaluate the unembedding hypothesis. 
 
-I would propose the similarlity between top-k distance. 
+As an alternate metric beyond cosine similarity, I proposed **Top‑K dimension overlap**: for each token’s unembedding vector, take the indices of the top‑\(K\) coordinates by absolute value, and score an (animal, number) pair by the fraction of overlap between their top‑\(K\) sets. The goal is to capture “shared active features” even when cosine similarity is dominated by a few large directions.
+
+I also set up an evaluation harness in `topic_b_step4.py` that compares (A) cosine similarity and (B) top‑\(K\) overlap against an operational forward-direction entanglement score derived from next-token probability ratios under a small animal-mention intervention. However, it did not perform as well as I liked. I’m intentionally not leaning too hard on this in my conclusions: the result is sensitive to prompt choice and concept set, and I didn’t do a large enough sweep here to feel confident about generalization.
+So: I think this is a reasonable way to *test* the unembedding-geometry hypothesis, but I’m not treating it as a completed measurement in this writeup.
 
 ### Step 5
 
 Based on your results so far, what is your best guess about what is causing the subliminal prompting effect? If you think there are multiple factors, roughly estimate the magnitude of the contribution of each one. Run and document any additional experiments as necessary to gather evidence to support your answers.
 
-TODO
+Given what I ran here (a forward-direction probe on one target concept, plus the owl/087 reverse-direction comparison across base vs instruct with \(n=3\) seeds), I don’t think there’s a single clean “cause.” My best guess is that there are **multiple interacting contributors**, and it’s safest to separate “why *some* pairs work at all” from “why the *reported ratios* can look huge.”
+
+#### 1) Some real token-level coupling (moderate contributor)
+
+I think there is a real model-internal coupling for some animal↔number pairs, in the sense that mentioning an animal can measurably reshape the next-token distribution over numbers (and vice versa). My forward run (lion→275) gives a top specificity around **1.35** in `plots_b/forward_entangled_lion.csv`, which is “not nothing,” but it’s also not an enormous effect by itself. This is consistent with the paper’s hypothesis that static weight geometry (including unembedding geometry) could be part of the story, but based on what I actually ran I wouldn’t claim geometry alone explains the full reverse-direction effect.
+
+#### 2) Ratio inflation from tiny baselines (large contributor to headline multipliers)
+
+The reverse-direction metric I recorded is a **multiplier** \(P(\text{owl}\mid\text{subliminal}) / P(\text{owl}\mid\text{baseline})\). This can look dramatic when the baseline probability is very small. In `reverse_llama_base_vs_instruct_owl_087.csv`, the instruct model’s baseline \(P(\text{owl})\) is about **5× smaller** than the base model’s, and the two “big” instruct seeds are exactly the ones with very small baselines. So I think a substantial fraction of the 50× / 113× headline numbers is denominator effects, not a proportionally larger underlying semantic shift.
+
+#### 3) Instruction tuning / prompt compliance (sometimes large, but not robust)
+
+Even after accounting for baseline size, the instruct model sometimes shows a much larger *absolute* increase in \(P(\text{owl})\) under the "love 087" system prompt (e.g. seed 0 goes from ~\(1.9\times10^{-4}\) to ~\(2.1\times10^{-2}\)). But it’s also clearly **seed-sensitive** (seed 2 slightly reverses). My read is: instruction tuning can amplify the effect for some initializations (by taking the system prompt more literally / globally), but at the current sample size it doesn’t look robust enough to treat as a stable amplification mechanism.
+
+If I had to summarize: token-level coupling seems real but modest in a forward probe; the very large reverse-direction multipliers are mostly explained by **(a) the ratio metric interacting with tiny baselines** plus **(b) instruction-tuned compliance sometimes amplifying the shift**, rather than a single clean geometric mechanism that reliably produces huge effects across seeds and prompt variants.
 
 ## Before You Submit
 
@@ -156,13 +189,12 @@ Congrats on completing the main takehome!
 
 If you had any technical difficulties, work disruptions, or other things you'd like the grader to take into consideration, please write them here: 
 
-TODO
+I had very spotty wifi and this frequently disrupted my gpu connection unfortunately, and disrupted several of my experiments, which I had to rerun several times. Hence this is why I had to submit five minutes late (tried to connect back to MIT wifi).
 
 Please fill in the following to help us better design future takehomes (these won't affect grading in any way):
 
-- One-line description of what compute resources you used here: TODO
-- One-line description of any AI assistance you used here: TODO
-
+- One-line description of what compute resources you used here: MIT GPUs, VastAI
+- One-line description of any AI assistance you used here: AI for coding, debugging, and explaining concepts.
 
 ## Optional Bonus Section
 
