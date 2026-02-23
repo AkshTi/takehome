@@ -60,7 +60,15 @@ Pick at least 3 out of the 9+ items above and implement and run the experiments.
 
 #### Experiment 3:
 
-[TODO](link_to_figure.png)
+### Effect of temperature (T)
+
+Overall, changing the distillation temperature in this range does **not** change the main qualitative outcome of the experiment. The **ghost** condition is consistently high across all (T) values (roughly **0.929–0.936**), while the **all** condition stays essentially at chance (around **0.10**) no matter what temperature I use. So temperature is not what’s making ghost distillation succeed, and it also does not “rescue” the all condition—those behaviors look structurally stable.
+
+Where temperature *does* have a visible effect is on the **eT** metric. eT increases as (T) rises from 0 to 2 (**0.137 → 0.157**), then stops improving (it dips slightly at (T=4) and is roughly flat again by (T=8)). My interpretation is that moderate temperature softening makes the teacher targets smoother and slightly easier to match early on, but beyond (T\approx 2) there are diminishing returns and small non-monotone fluctuations that are likely just optimization noise rather than a real trend. If I had to choose a “best” temperature from this table alone, it would be **around (T=2)**, but I don’t think the difference is large enough to be a central claim.
+
+The same pattern shows up in **ghost_rand**, which remains very small overall (**0.037–0.057**) but is slightly higher near (T=2). That’s consistent with the idea that softer targets can make even a mismatched/random setup look marginally less dead, but the effect is still tiny compared to the real ghost condition—temperature can smooth optimization, but it does not create the alignment mechanism by itself.
+
+Finally, the gap-style summaries are also stable: **ghost_minus_ref** stays around **0.829–0.836**, and **all_minus_ref** stays around **0.773–0.792** across temperatures. This supports the same conclusion: within this range, temperature is mostly a small tuning knob, not the driver of the phenomenon.
 
 
 ### Step 3
