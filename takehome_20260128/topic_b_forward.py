@@ -160,20 +160,16 @@ def next_token_probs(prompt_text: str) -> torch.Tensor:
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": prompt_text},
     ]
-    # FIX: Tokenize directly through the template to handle special tokens
-    # and BOS alignment perfectly.
-    input_ids = tokenizer.apply_chat_template(
+    prompt = tokenizer.apply_chat_template(
         messages,
-        tokenize=True,
+        tokenize=False,
         add_generation_prompt=True,
-        return_tensors="pt"
-    ).to(model.device)
+    )
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
     with torch.no_grad():
-        # Pass input_ids directly
-        logits = model(input_ids=input_ids).logits
+        logits = model(**inputs).logits
 
-    # Your float32 cast is perfect here—keep it!
     probs = logits[0, -1, :].to(torch.float32).softmax(dim=-1)
     return probs.cpu()
 
