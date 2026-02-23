@@ -137,7 +137,7 @@ for model_name in MODELS:
             _chat = tokenizer.apply_chat_template(
                 messages, tokenize=True, add_generation_prompt=True
             )
-            chat_ids = _chat if isinstance(_chat, list) else _chat["input_ids"][0].tolist()
+            chat_ids = _chat if isinstance(_chat, list) else list(_chat["input_ids"])
             prefix_ids = tokenizer.encode(ASSISTANT_PREFIX, add_special_tokens=False)
             return chat_ids + prefix_ids
 

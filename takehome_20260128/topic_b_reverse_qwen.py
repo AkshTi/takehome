@@ -173,9 +173,10 @@ for model_name in MODELS:
                 {"role": "system", "content": system_content},
                 {"role": "user",   "content": USER_QUESTION},
             ]
-            chat_ids   = tokenizer.apply_chat_template(
+            _chat = tokenizer.apply_chat_template(
                 messages, tokenize=True, add_generation_prompt=True
             )
+            chat_ids   = _chat if isinstance(_chat, list) else list(_chat["input_ids"])
             prefix_ids = tokenizer.encode(ASSISTANT_PREFIX, add_special_tokens=False)
             return chat_ids + prefix_ids
 
