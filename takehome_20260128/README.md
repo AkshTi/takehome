@@ -138,7 +138,7 @@ TODO
 
 One interesting data point would be whether the same entangled pairs exist in both a base (pretrained) model and the instruct version derived from that base model. Find such a pair of models and design prompts to test this.
 
-Evaluate qwen small original and awen instruction tuned. 
+Ideally prompts in models that are not instructin tuned would lead to extensively providing context for what we are doing.  
 
 ### Step 4
 

@@ -31,7 +31,29 @@ import torch
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from topic_b_utils import get_all_number_tokens
+def get_numeric_token_ids(tokenizer):
+    """
+    Find all purely numeric tokens in the vocabulary by iterating over
+    tokenizer.get_vocab() and stripping ByteLevelBPE space prefixes (Ġ)
+    before checking .isdigit().
+
+    Using get_vocab() directly (rather than tokenizer.decode(id).strip())
+    avoids the risk that decode() re-merges subword pieces for special IDs
+    and ensures we catch tokens like 'Ġ087' -> '087' that would otherwise
+    fail a plain .isdigit() check.
+
+    Returns:
+        number_token_ids : list[int]  — token IDs of purely numeric tokens
+        num_strings      : dict[int, str] — maps token_id -> clean numeric string
+    """
+    number_token_ids = []
+    num_strings = {}
+    for vocab_str, token_id in tokenizer.get_vocab().items():
+        clean_str = vocab_str.replace("Ġ", "").replace("▁", "")  # BPE & SP prefixes
+        if clean_str.isdigit():
+            number_token_ids.append(token_id)
+            num_strings[token_id] = clean_str
+    return number_token_ids, num_strings
 
 PLOTS_DIR = Path("plots_b")
 PLOTS_DIR.mkdir(exist_ok=True)
@@ -59,7 +81,7 @@ print("Model loaded.\n")
 # --- Numeric vocabulary ---
 
 print("Extracting purely numeric tokens from model vocabulary ...")
-num_token_ids, num_strings = get_all_number_tokens(tokenizer)
+num_token_ids, num_strings = get_numeric_token_ids(tokenizer)
 # Tensor version for efficient batch-indexing of probability vectors.
 num_id_tensor = torch.tensor(num_token_ids, dtype=torch.long)
 print(f"Found {len(num_token_ids)} purely numeric tokens in vocabulary.\n")
@@ -224,8 +246,8 @@ print("─" * 62)
 
 top_results = []
 for rank, idx in enumerate(order[:10].tolist(), start=1):
-    tok_str = num_strings[idx]
     tok_id  = num_token_ids[idx]
+    tok_str = num_strings[tok_id]   # dict keyed by token_id, not argsort index
     spec    = specificity[idx].item()
     tgt_r   = target_ratio[idx].item()
     oth_r   = mean_other[idx].item()
