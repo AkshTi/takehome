@@ -25,7 +25,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 # %%
 # ─── Configuration ────────────────────────────────────────────────────────────
 
-MODEL_NAME    = "meta-llama/Llama-3.2-1B-Instruct"
+MODEL_NAME    = "unsloth/Llama-3.2-1B-Instruct"
 TARGET_ANIMAL = "owl"   # string — the concept whose probability we measure
 TARGET_NUMBER = "087"   # string — the subliminal numeric trigger (NOT int)
 

@@ -62,10 +62,9 @@ PLOTS_DIR.mkdir(exist_ok=True)
 # ─── Phase 1: Setup ───────────────────────────────────────────────────────────
 
 # Load model with bfloat16 to save memory while preserving logit precision.
-# Default: Llama-3.2-1B-Instruct (matches existing experiments).
-# Swap MODEL_NAME for a larger model (e.g. meta-llama/Meta-Llama-3-8B-Instruct)
-# to reproduce the paper's exact numbers.
-MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
+# unsloth/Llama-3.2-1B-Instruct is an ungated mirror of meta-llama/Llama-3.2-1B-Instruct
+# with identical weights, tokenizer, and architecture — no HF approval required.
+MODEL_NAME = "unsloth/Llama-3.2-1B-Instruct"
 
 print(f"Loading model: {MODEL_NAME} (bfloat16) ...")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)

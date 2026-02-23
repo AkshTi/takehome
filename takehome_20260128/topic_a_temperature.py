@@ -66,8 +66,11 @@ With N_MODELS=25 and BATCH_SIZE=1024 each batch materialises ~80 MB of
 activations.  On smaller GPUs, reduce to BATCH_SIZE=256 or N_MODELS=8.
 """
 
+import glob
+import gzip
 import math
 import os
+import shutil
 from typing import Sequence
 
 import matplotlib.pyplot as plt
@@ -160,11 +163,30 @@ class MultiClassifier(nn.Module):
 
 
 # ───────────────────────────── data helpers ──────────────────────────────────
+def _purge_corrupt_mnist(root: str) -> None:
+    """Delete any truncated/corrupt gz files so torchvision re-downloads them."""
+    raw_dir = os.path.join(root, "MNIST", "raw")
+    if not os.path.isdir(raw_dir):
+        return
+    for gz_path in glob.glob(os.path.join(raw_dir, "*.gz")):
+        try:
+            with gzip.open(gz_path, "rb") as f:
+                f.read()
+        except (EOFError, OSError):
+            print(f"[get_mnist] Removing corrupt file: {gz_path}", flush=True)
+            os.remove(gz_path)
+            # Also remove the extracted file so torchvision re-extracts cleanly.
+            extracted = gz_path[:-3]
+            if os.path.exists(extracted):
+                os.remove(extracted)
+
+
 def get_mnist():
     tfm = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
     )
     root = os.path.expanduser("~/.pytorch/MNIST_data/")
+    _purge_corrupt_mnist(root)
     return (
         datasets.MNIST(root, download=True, train=True,  transform=tfm),
         datasets.MNIST(root, download=True, train=False, transform=tfm),

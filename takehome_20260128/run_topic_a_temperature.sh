@@ -11,7 +11,7 @@
 
 mkdir -p /home/akshatat/takehome/logs
 
-source activate distill
+source ~/.bashrc && conda activate distill
 
 echo "Job ID:     $SLURM_JOB_ID"
 echo "Node:       $SLURMD_NODENAME"
